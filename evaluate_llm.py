@@ -57,16 +57,40 @@ def parse_args():
         help="Whether the model uses thinking",
     )
     
+    parser.add_argument(
+        "--use_vllm",
+        type=str,
+        default="False",
+        help="Whether to use vLLM for faster inference",
+    )
+    
     return parser.parse_args()
 
 
 async def main():
     args = parse_args()
+    
+    # Parse use_vllm argument
+    if args.use_vllm == "True":
+        use_vllm = True
+    elif args.use_vllm == "False":
+        use_vllm = False
+    else:
+        raise ValueError("use_vllm must be True or False")
+    
+    # Parse is_thinking argument
+    if args.is_thinking == "True":
+        args.is_thinking = True
+    elif args.is_thinking == "False":
+        args.is_thinking = False
+    else:
+        raise ValueError("is_thinking must be True or False")
+    
     start_time = time.time()
     if args.is_gguf == "True":
         model_runner = load_llama_model_runner(args.model_id)
     elif args.is_gguf == "False":
-        model_runner = load_model_runner(args.model_id)
+        model_runner = load_model_runner(args.model_id, use_vllm=use_vllm)
     else:
         raise ValueError("is_gguf must be True or False")
     end_time = time.time()
@@ -80,15 +104,11 @@ async def main():
             "model_id": args.model_id,
             "dataset": args.dataset,
             "subsets": args.subsets,
+            "use_vllm": use_vllm,
+            "is_thinking": args.is_thinking,
         },
     )
     """
-    if args.is_thinking == "True":
-        args.is_thinking = True
-    elif args.is_thinking == "False":
-        args.is_thinking = False
-    else:
-        raise ValueError("is_thinking must be True or False")
     # Get appropriate evaluator and run evaluation
     evaluator = get_evaluator(args.dataset, model_runner, wandb.config)
     start_time = time.time()
