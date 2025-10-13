@@ -126,41 +126,59 @@ class AbsModel(abc.ABC):
 
 class HFModel(AbsModel):
 
-    def __init__(self, model_name_or_path: str, compile=False):
+    def __init__(self, model_name_or_path: str, compile=False, use_vllm=False):
+        self.use_vllm = use_vllm
+        self.model_name = model_name_or_path
+        
         tokenizer = AutoTokenizer.from_pretrained(
             model_name_or_path, trust_remote_code=True,
         )
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name_or_path,
-            device_map="auto",
-            trust_remote_code=True,
-            torch_dtype=torch.bfloat16,
-            attn_implementation="flash_attention_2",
-        )
         tokenizer.padding_side = "left"
-        model_max_length = min(_get_and_verify_max_len(model.config), 8192)
+        
+        if use_vllm:
+            # vLLM initialization
+            from vllm import LLM
+            self.model = LLM(
+                model=model_name_or_path,
+                trust_remote_code=True,
+                dtype="bfloat16",
+                max_model_len=8192,
+            )
+            # Get config from vLLM's model
+            model_max_length = min(self.model.llm_engine.model_config.max_model_len, 8192)
+        else:
+            # Standard HF initialization
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name_or_path,
+                device_map="auto",
+                trust_remote_code=True,
+                torch_dtype=torch.bfloat16,
+                attn_implementation="flash_attention_2",
+            )
+            
+            model_max_length = min(_get_and_verify_max_len(model.config), 8192)
+            
+            if compile:
+                try:
+                    model = torch.compile(model, mode="reduce-overhead", fullgraph=True)
+                except Exception as e:
+                    pass
+
+            model.eval()
+            self.model = model
+            self.model.generation_config.pad_token_id = tokenizer.pad_token_id
+        
         self.max_generation_length = MAX_GENERATION_LENGTH
         self.model_max_length = model_max_length
+        
         if tokenizer.pad_token is None:
             tokenizer.pad_token = (
                 tokenizer.bos_token
                 if tokenizer.bos_token is not None
                 else tokenizer.eos_token
             )
-
         
-
-        if compile:
-            try:
-                model = torch.compile(model, mode="reduce-overhead", fullgraph=True)
-            except Exception as e:
-                pass
-
-        model.eval()
-        self.model_name = model_name_or_path
-        self.model = model
         self.tokenizer = tokenizer
-        self.model.generation_config.pad_token_id = self.tokenizer.pad_token_id
     @torch.inference_mode()
     def get_logprobs_nlg(self, inputs, label_ids=None, label_attn=None):
         inputs = self.tokenizer(
@@ -288,46 +306,75 @@ class HFModel(AbsModel):
             ]
         end_time = time.time()
         print(f"Tokenization time: {end_time - start_time} seconds")
-        start_time = time.time()
+        
         if is_thinking:
-            self.max_generation_length = 2048
-        inputs = self.tokenizer(
-            prompts,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=self.model_max_length - self.max_generation_length,
-        ).to(self.model.device)
-        end_time = time.time()
-        print(f"Input encoding time: {end_time - start_time} seconds")
-        start_time = time.time()
-        input_sizes = inputs["input_ids"].shape[-1]
-
-        if "sea-lion" in self.model_name and "token_type_ids" in inputs.keys():
-            del inputs["token_type_ids"]
-
+            max_tokens = 2048
+        else:
+            max_tokens = self.max_generation_length
+        
         temperature = kwargs.pop("temperature", 0.2)
-        start_time = time.time()
-        outputs = self.model.generate(
-            **inputs,
-            do_sample=True,
-            temperature=temperature,
-            max_new_tokens=self.max_generation_length,
-            eos_token_id=self._get_terminator(),
-            **kwargs,
-        )
-        end_time = time.time()
-        print(f"Generation time: {end_time - start_time} seconds")
-        start_time = time.time()
-        preds = self.tokenizer.batch_decode(
-            outputs[:, input_sizes:], skip_special_tokens=True
-        )
+        
+        if self.use_vllm:
+            # vLLM generation path
+            from vllm import SamplingParams
+            
+            # Get stop tokens
+            stop_token_ids = self._get_terminator()
+            stop_tokens = [self.tokenizer.decode([tid]) for tid in stop_token_ids if isinstance(tid, int)]
+            
+            sampling_params = SamplingParams(
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stop_token_ids=stop_token_ids,
+                skip_special_tokens=True,
+            )
+            
+            start_time = time.time()
+            outputs = self.model.generate(prompts, sampling_params)
+            end_time = time.time()
+            print(f"Generation time: {end_time - start_time} seconds")
+            
+            preds = [output.outputs[0].text for output in outputs]
+        else:
+            # Standard HF generation path
+            start_time = time.time()
+            inputs = self.tokenizer(
+                prompts,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=self.model_max_length - max_tokens,
+            ).to(self.model.device)
+            end_time = time.time()
+            print(f"Input encoding time: {end_time - start_time} seconds")
+            
+            input_sizes = inputs["input_ids"].shape[-1]
+
+            if "sea-lion" in self.model_name and "token_type_ids" in inputs.keys():
+                del inputs["token_type_ids"]
+
+            start_time = time.time()
+            outputs = self.model.generate(
+                **inputs,
+                do_sample=True,
+                temperature=temperature,
+                max_new_tokens=max_tokens,
+                eos_token_id=self._get_terminator(),
+                **kwargs,
+            )
+            end_time = time.time()
+            print(f"Generation time: {end_time - start_time} seconds")
+            
+            preds = self.tokenizer.batch_decode(
+                outputs[:, input_sizes:], skip_special_tokens=True
+            )
+        
         if is_thinking:
             preds = [p.split("</think>")[-1] for p in preds]
         return {"responses": preds}
 
 
-def load_model_runner(model_name: str, fast=False):
+def load_model_runner(model_name: str, fast=False, use_vllm=False):
     model_type = ModelType(model_name)
     if model_type.is_api:
         if model_type.model_type == "openai":
@@ -336,7 +383,7 @@ def load_model_runner(model_name: str, fast=False):
             model_runner = GeminiModel(model_name, batch_size=8)
     elif model_type.model_type == "HF":
         try:
-            model_runner = HFModel(model_name, compile=fast)
+            model_runner = HFModel(model_name, compile=fast, use_vllm=use_vllm)
         except:
             raise ValueError(f"Model {model_name} is neither a huggingface model nor an API model")
     return model_runner
