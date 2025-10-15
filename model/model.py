@@ -143,6 +143,9 @@ class HFModel(AbsModel):
                 trust_remote_code=True,
                 dtype="bfloat16",
                 max_model_len=8192,
+                # Add additional parameters to match HF behavior
+                gpu_memory_utilization=0.9,
+                enforce_eager=False,  # Use CUDA graphs for better performance
             )
             # Get config from vLLM's model
             model_max_length = min(self.model.llm_engine.model_config.max_model_len, 8192)
@@ -318,15 +321,21 @@ class HFModel(AbsModel):
             # vLLM generation path
             from vllm import SamplingParams
             
-            # Get stop tokens
+            # Get stop tokens - use only the first one for eos_token_id compatibility
             stop_token_ids = self._get_terminator()
-            stop_tokens = [self.tokenizer.decode([tid]) for tid in stop_token_ids if isinstance(tid, int)]
+            eos_token_id = stop_token_ids[0] if stop_token_ids else None
             
             sampling_params = SamplingParams(
                 temperature=temperature,
                 max_tokens=max_tokens,
                 stop_token_ids=stop_token_ids,
                 skip_special_tokens=True,
+                # Add missing parameters to match HF behavior
+                top_p=kwargs.get("top_p", 1.0),
+                top_k=kwargs.get("top_k", -1),
+                repetition_penalty=kwargs.get("repetition_penalty", 1.0),
+                # Ensure sampling is enabled (this is critical!)
+                use_beam_search=False,
             )
             
             start_time = time.time()
