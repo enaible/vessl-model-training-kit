@@ -334,7 +334,7 @@ class HFModel(AbsModel):
                 top_p=kwargs.get("top_p", 1.0),
                 top_k=kwargs.get("top_k", -1),
                 repetition_penalty=kwargs.get("repetition_penalty", 1.0),
-                # Ensure sampling is enabled (this is critical!)
+                # Ensure sampling is enabled
                 use_beam_search=False,
             )
             
