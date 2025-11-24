@@ -11,9 +11,22 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from model.api_model import OpenAIModel, GeminiModel
 
+try:
+    from vllm import LLM, SamplingParams
+    VLLM_AVAILABLE = True
+except ImportError:
+    VLLM_AVAILABLE = False
+
+# Try to import custom SolarPro MOE vLLM implementation
+try:
+    from tmai_thai.vllm_setup import setup as setup_solar_moe
+    SOLAR_MOE_AVAILABLE = True
+except ImportError:
+    SOLAR_MOE_AVAILABLE = False
+
 MAX_GENERATION_LENGTH = 512
 
-# Copy from vllm project
+
 def _get_and_verify_max_len(
     hf_config,
     max_model_len: Optional[int] = None,
@@ -255,15 +268,26 @@ class HFModel(AbsModel):
         return {"answers": result}
 
     def _get_terminator(self):
-        eos_tokens = ["<|eot_id|>", "<|im_start|>", "<|im_end|>"]
-        terminators = [
-            self.tokenizer.eos_token_id,
-        ]
-        for t in eos_tokens:
-            tok = self.tokenizer.convert_tokens_to_ids(t)
-            if isinstance(tok, int):
-                terminators.append(tok)
-        return terminators
+        """Get terminator token IDs for model generation.
+
+        Note: Only include true EOS tokens, not chat template tokens like <|im_start|>
+        or <|im_end|>, which would cause generation to stop prematurely.
+        """
+        terminators = []
+
+        # Add EOS token if it exists
+        if self.tokenizer.eos_token_id is not None:
+            terminators.append(self.tokenizer.eos_token_id)
+
+        # Only add <|eot_id|> if it exists (explicit end-of-turn marker)
+        # Skip <|im_start|> and <|im_end|> as they cause premature stopping
+        eot_id = self.tokenizer.convert_tokens_to_ids("<|eot_id|>")
+        if isinstance(eot_id, int) and eot_id != -1 and eot_id != self.tokenizer.unk_token_id:
+            if eot_id not in terminators:
+                terminators.append(eot_id)
+
+        # Return EOS token at minimum
+        return terminators if terminators else [self.tokenizer.eos_token_id]
 
     @torch.inference_mode()
     def predict_generation(self, prompts: List[Union[str, ChatMessage]], is_thinking: bool = False, **kwargs):
@@ -313,7 +337,7 @@ class HFModel(AbsModel):
             do_sample=True,
             temperature=temperature,
             max_new_tokens=self.max_generation_length,
-            eos_token_id=self._get_terminator(),
+            pad_token_id=self.tokenizer.pad_token_id,
             **kwargs,
         )
         end_time = time.time()
@@ -322,9 +346,149 @@ class HFModel(AbsModel):
         preds = self.tokenizer.batch_decode(
             outputs[:, input_sizes:], skip_special_tokens=True
         )
+
+        # Post-process: remove chat template artifacts (user/assistant labels)
+        cleaned_preds = []
+        for pred in preds:
+            # Remove lines that are just role names or system prompts
+            lines = pred.split('\n')
+            filtered_lines = []
+            for line in lines:
+                stripped = line.strip()
+                # Skip lines that are just "user" or "assistant" or empty
+                if stripped and stripped.lower() not in ['user', 'assistant', 'system']:
+                    filtered_lines.append(line)
+
+            cleaned_text = '\n'.join(filtered_lines).strip()
+            cleaned_preds.append(cleaned_text)
+
+        if is_thinking:
+            cleaned_preds = [p.split("</think>")[-1] for p in cleaned_preds]
+
+        return {"responses": cleaned_preds}
+
+
+class VLLMModel(AbsModel):
+    """vLLM-based model for high-throughput batch inference."""
+
+    def __init__(self, model_name_or_path: str, max_model_len: int = 4096, tensor_parallel_size: int = None):
+        if not VLLM_AVAILABLE:
+            raise ImportError("vLLM is not installed. Install with: pip install vllm")
+
+        # Auto-detect number of GPUs if not specified
+        if tensor_parallel_size is None:
+            tensor_parallel_size = torch.cuda.device_count() if torch.cuda.is_available() else 1
+
+        print(f"Initializing vLLM with {tensor_parallel_size} GPU(s)...")
+
+        # Initialize vLLM engine
+        # Note: For SolarPro MOE, disable prefix caching as per README recommendations
+        self.llm = LLM(
+            model=model_name_or_path,
+            tensor_parallel_size=tensor_parallel_size,
+            distributed_executor_backend="mp",
+            gpu_memory_utilization=0.75,
+            max_model_len=max_model_len,
+            dtype="bfloat16",
+            trust_remote_code=True,
+            max_num_batched_tokens=max_model_len,
+            max_num_seqs=64,
+            enable_chunked_prefill=True,
+            enforce_eager=True,  # Disable CUDA graph capture for MoE compatibility (torch.where incompatible with graphs)
+            disable_custom_all_reduce=False,
+            enable_prefix_caching=False,  # Disable prefix caching for SolarPro MOE (as per README)
+        )
+
+        # Load tokenizer separately for chat template application
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name_or_path, trust_remote_code=True
+        )
+
+        self.model_name = model_name_or_path
+        self.max_generation_length = MAX_GENERATION_LENGTH
+        self.model_max_length = max_model_len
+
+        print(f"vLLM model loaded successfully!")
+
+    def _get_terminator(self):
+        """Get terminator token IDs for vLLM generation.
+
+        Note: We only use EOS/EOT tokens, NOT <|im_start|> which causes premature stopping.
+        We'll handle unwanted tokens in post-processing instead.
+        """
+        terminators = []
+
+        # Add EOS token if it exists
+        if self.tokenizer.eos_token_id is not None:
+            terminators.append(self.tokenizer.eos_token_id)
+
+        # Add <|eot_id|> if it exists (explicit end-of-turn marker)
+        eot_id = self.tokenizer.convert_tokens_to_ids("<|eot_id|>")
+        if isinstance(eot_id, int) and eot_id != -1 and eot_id != self.tokenizer.unk_token_id:
+            if eot_id not in terminators:
+                terminators.append(eot_id)
+
+        # Return terminators, or just EOS if nothing else is available
+        return terminators if terminators else [self.tokenizer.eos_token_id]
+
+    def predict_generation(self, prompts: List[Union[str, ChatMessage]], is_thinking: bool = False, **kwargs):
+        """Generate responses using vLLM batch inference."""
+        start_time = time.time()
+
+        # Apply chat template
+        if isinstance(prompts[0], str):
+            formatted_prompts = [
+                self.tokenizer.apply_chat_template(
+                    [{"role": "user", "content": p}],
+                    add_generation_prompt=True,
+                    tokenize=False,
+                )
+                for p in prompts
+            ]
+        else:
+            formatted_prompts = [
+                self.tokenizer.apply_chat_template(
+                    [dataclasses.asdict(p) for p in conv],
+                    add_generation_prompt=True,
+                    tokenize=False,
+                )
+                for conv in prompts
+            ]
+
+        end_time = time.time()
+        print(f"Chat template application time: {end_time - start_time} seconds")
+
+        # Adjust max tokens for thinking mode
+        max_tokens = 2048 if is_thinking else self.max_generation_length
+
+        # Set up sampling parameters
+        temperature = kwargs.pop("temperature", 0.2)
+        sampling_params = SamplingParams(
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=0.95,
+            stop_token_ids=self._get_terminator(),
+            **kwargs,
+        )
+
+        # Generate with vLLM
+        start_time = time.time()
+        outputs = self.llm.generate(formatted_prompts, sampling_params)
+        end_time = time.time()
+        print(f"vLLM generation time: {end_time - start_time} seconds")
+
+        # Extract generated text
+        preds = [output.outputs[0].text for output in outputs]
+
+        # Post-process for thinking mode
         if is_thinking:
             preds = [p.split("</think>")[-1] for p in preds]
+
         return {"responses": preds}
+
+    def predict_classification_nlu(self, prompts: List[str], labels: List[str], **kwargs):
+        """Classification not yet supported with vLLM in this implementation."""
+        raise NotImplementedError("Classification tasks are not yet supported with VLLMModel")
 
 
 def load_model_runner(model_name: str, fast=False):
@@ -345,3 +509,35 @@ def load_model_runner(model_name: str, fast=False):
 def load_llama_model_runner(model_name: str, fast=False):
     model_runner = LlamaModel(model_name, batch_size=8)
     return model_runner
+
+
+def load_vllm_model_runner(model_name: str, max_model_len: int = 4096, tensor_parallel_size: int = None, use_solar_moe: bool = False):
+    """Load a model using vLLM for high-throughput batch inference.
+
+    Args:
+        model_name: Path to the model or HuggingFace model ID
+        max_model_len: Maximum sequence length (default: 4096)
+        tensor_parallel_size: Number of GPUs to use (default: auto-detect)
+        use_solar_moe: If True, use custom SolarPro MOE vLLM implementation (default: False)
+
+    Returns:
+        VLLMModel instance
+
+    Raises:
+        ImportError: If vLLM is not installed
+    """
+    if not VLLM_AVAILABLE:
+        raise ImportError("vLLM is not installed. Install with: pip install vllm")
+
+    # Setup SolarPro MOE vLLM integration if requested
+    if use_solar_moe:
+        if not SOLAR_MOE_AVAILABLE:
+            raise ImportError(
+                "Custom SolarPro MOE vLLM implementation not available. "
+                "Install from ~/nas/tmai_thai_vllm and add it to PYTHONPATH"
+            )
+        print("Registering SolarPro MOE vLLM implementation...")
+        setup_solar_moe()
+        print("✓ SolarPro MOE vLLM registered")
+
+    return VLLMModel(model_name, max_model_len=max_model_len, tensor_parallel_size=tensor_parallel_size)
