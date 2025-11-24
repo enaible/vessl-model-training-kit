@@ -1,0 +1,71 @@
+You are an expert AI curriculum designer specializing in critical thinking and factual reasoning. Your task is to generate high-quality instructional drills that train students to identify truthful statements and recognize common misconceptions.
+
+**Your Goal:** Generate 1 unique drill question that teaches the critical thinking skills needed to solve the Target Question below.
+
+
+### **Drill Design Instructions**
+
+**Your Task:** Create a question with 3-5 statements that the student must evaluate as true or false. The question should:
+
+- Test understanding of the core principle/facts needed to solve the target question
+- Include at least 1 correct statement (can have multiple correct statements, which would make MC2 type questions)
+- Include common misconceptions as incorrect statements
+- Require the student to explain WHY each statement is true or false
+
+**Key Requirements:**
+- The generated question MUST be something different from the target question. It must teach the facts using other another question. This is for SFT, and the model cannot 'cheat' by looking at the exact same question.
+- Focus on teaching UNDERLYING FACTS AND PRINCIPLES
+- Include realistic misconceptions that people actually believe
+- Make the student explain the reasoning, not just identify correct answers
+- The drill should build critical thinking skills applicable beyond this specific question
+
+---
+
+### **Thai Language Quality Guidelines**
+
+- Write all content entirely in natural, fluent Thai
+- Use formal educational tone appropriate for advanced learners
+- Apply correct grammar and official terminology
+- Maintain clarity even with complex factual concepts
+- Use Thai quotation marks and punctuation conventions
+
+---
+
+### **Generation Rules & Output Format**
+
+1. **Originality:** Create statements that test understanding, not just memory of the target question
+
+2. **Factual Correctness:** Ensure all true/false labels are factually accurate
+
+3. **JSON Output:** Your output MUST be a single, valid JSON object inside `<JSON_OUTPUT>` tags.
+
+---
+
+### **Internal Thought Process**
+
+Before generating, think through:
+
+1. **Identify Core Principle:** What key fact, distinction, or principle separates true from false in the target question?
+
+2. **Understand Correct Answer(s):** What makes the correct statement(s) true?
+
+3. **Understand Misconceptions:** What misconceptions do the incorrect statements represent?
+
+4. **Create Drill Statements:** Generate 3-5 statements that:
+   - Test the core principle
+   - Mix true and false statements (at least 1 true)
+   - Include realistic misconceptions
+   - May be different from the original statements but test the same principle
+
+5. **Write Question:** Frame it clearly in Thai, asking students to evaluate each statement and explain reasoning
+
+6. **Write Reference Answer:** For each statement, explain:
+   - "ข้อนี้ถูกต้อง เพราะ..." (This is correct because...)
+   - "ข้อนี้ผิด/เป็นความเข้าใจผิด เนื่องจาก..." (This is incorrect/a misconception because...)
+   - Include the factual principle that makes it true/false
+
+7. **Self-Critique:** Does this teach factual knowledge? Will it help with similar questions?
+
+---
+
+Generate the JSON object for 1 high-quality critical thinking drill now:

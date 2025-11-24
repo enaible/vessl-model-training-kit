@@ -19,16 +19,35 @@ from torch.optim import AdamW
 
 # Set environment variables
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
-os.environ["HF_HOME"] = "/root/data/hf_models"
+os.environ["HF_HOME"] = "/root/nas/models"
 run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # Model and dataset paths
-model_slug = "/root/data/vessl-ai-kt-debugging/solar-pro-8.49b-mtbench-400k-thaiexam-detailed-100k-sft-longer-input-checkpoint-35000/"
-eng_train_dataset_path = "/root/data/vessl-ai-kt-debugging/200k_threads_no_think_eng.jsonl"
+model_slug = "/root/nas/vessl-ai-kt/solar-pro-8.49b-h5-additional-engthai-training/threequarter-epoch/"
+eng_train_dataset_path = "/root/nas/vessl-ai-kt/SFT_data_gen/output/"
 train_dataset_path = "/root/data/vessl-ai-kt-debugging/mtbench_hard_training.jsonl"
 val_dataset_path = "/root/data/vessl-ai-kt-debugging/mtbench_hard_eval.jsonl"
 thaiexam_dataset_path = "/root/data/vessl-ai-kt-debugging/thaiexam_hard_training.jsonl"
 thaiexam_val_dataset_path = "/root/data/vessl-ai-kt-debugging/thaiexam_hard_eval.jsonl"
+hellaswag_en_dataset_path = "/root/nas/vessl-ai-kt/qwen_80b_data/hellaswag_training_en.jsonl"
+hellaswag_thai_dataset_path = "/root/nas/vessl-ai-kt/qwen_80b_data/hellaswag_training.jsonl"
+hellaswag_val_dataset_path = "/root/nas/vessl-ai-kt/qwen_80b_data/hellaswag_eval.jsonl"
+mmlu_en_dataset_path = "/root/nas/vessl-ai-kt/qwen_80b_data/mmlu_training_en.jsonl"
+mmlu_thai_dataset_path = "/root/nas/vessl-ai-kt/qwen_80b_data/mmlu_training.jsonl"
+mmlu_val_dataset_path = "/root/nas/vessl-ai-kt/qwen_80b_data/mmlu_eval.jsonl"
+truthfulqa_dataset_path = "/root/nas/vessl-ai-kt/qwen_32b_data/truthfulqa_training_explained_and_translated.jsonl"
+truthfulqa_val_dataset_path = "/root/nas/vessl-ai-kt/qwen_32b_data/truthfulqa_eval.jsonl"
+winogrande_en_dataset_path = "/root/nas/vessl-ai-kt/qwen_80b_data/winogrande_training_en.jsonl"
+winogrande_thai_dataset_path = "/root/nas/vessl-ai-kt/qwen_80b_data/winogrande_training.jsonl"
+winogrande_val_dataset_path = "/root/nas/vessl-ai-kt/qwen_80b_data/winogrande_eval.jsonl"
+arc_en_dataset_path = "/root/nas/vessl-ai-kt/qwen_32b_data/arc_training_en.jsonl"
+arc_thai_dataset_path = "/root/nas/vessl-ai-kt/qwen_32b_data/arc_training.jsonl"
+arc_val_dataset_path = "/root/nas/vessl-ai-kt/qwen_32b_data/arc_eval.jsonl"
+gsm8k_dataset_path = "/root/nas/vessl-ai-kt/qwen_80b_data/gsm8k_training_explained.jsonl"
+gsm8k_val_dataset_path = "/root/nas/vessl-ai-kt/qwen_80b_data/gsm8k_eval.jsonl"
+ifeval_dataset_path = "/root/nas/vessl-ai-kt/ifeval_training.jsonl"
+ifeval_val_dataset_path = "/root/nas/vessl-ai-kt/ifeval_eval.jsonl"
+
 
 def save_monitoring_csv(generator, output_csv="input_monitor.csv"):
     fieldnames = [
@@ -58,24 +77,31 @@ def custom_lr_scheduler(optimizer, num_warmup_steps, num_training_steps, anneal_
             return max(0.0, float(num_training_steps - current_step) / float(max(1, num_training_steps - anneal_start_step)))
     return LambdaLR(optimizer, lr_lambda, last_epoch=-1)
 
-def generated_thaiexam_to_message_format(dataset_path, tokenizer, max_length=1024):
-    """
-    Convert the generated thaiexam dataset to the message format.
-    """
+def generated_simple_question_to_message_format(dataset_path, tokenizer, max_length=512, dataset_size=-1, language="thai"):
     dataset = []
     for line in open(dataset_path, 'r', encoding='utf-8'):
         dataset.append(json.loads(line))
-
+    if dataset_size != -1:
+        dataset = dataset[:dataset_size]
     for example in dataset:
-        choices = [f"{k}) {example['choices'][k]}" for k in example['choices'].keys()]
-        question_with_choices = f"{example['question']}\n" + "\n".join(choices)
-        answer_text = f"{example['answer']['explanation']} คำตอบ: {example['answer']['label']}"
-        text = tokenizer.apply_chat_template([
-            {"role": "user", "content": question_with_choices},
-            {"role": "assistant", "content": answer_text},
-        ], tokenize=False)
+        if language == "thai":
+            question = example['question']
+        else:
+            question = example['en_question']
+        if language == "thai":
+            answer = example['reference']
+        else:
+            answer = example['en_reference']
+        
+        messages = [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": answer},
+        ]
+        
+        text = tokenizer.apply_chat_template(messages, tokenize=False)
         original_tokens = tokenizer(text, truncation=False, return_tensors=None)["input_ids"]
         original_length = len(original_tokens)
+        
         tokenized = tokenizer(
             text,
             truncation=True,
@@ -83,9 +109,20 @@ def generated_thaiexam_to_message_format(dataset_path, tokenizer, max_length=102
             padding="max_length",
             return_tensors=None
         )
+        
+        labels = tokenized["input_ids"].copy()
+        
+        user_text = tokenizer.apply_chat_template([{"role": "user", "content": question}], tokenize=False, add_generation_prompt=True)
+        user_tokens = tokenizer(user_text, add_special_tokens=False, return_tensors=None)["input_ids"]
+        mask_until = len(user_tokens)
+        
+        for i in range(min(mask_until, len(labels))):
+            labels[i] = -100
+        
         truncated_tokens = tokenized["input_ids"]
         truncated_length = len(truncated_tokens)
         truncated_text = tokenizer.decode(truncated_tokens, skip_special_tokens=False)
+        
         yield {
             "input_content_original": text,
             "input_content_original_length": original_length,
@@ -93,13 +130,173 @@ def generated_thaiexam_to_message_format(dataset_path, tokenizer, max_length=102
             "input_content_truncated_length": truncated_length,
             "input_ids": tokenized["input_ids"],
             "attention_mask": tokenized["attention_mask"],
-            "labels": tokenized["input_ids"].copy(),
+            "labels": labels,
         }
 
-def generate_formatted_examples(dataset_path, tokenizer, max_length=1024):
+def generated_mcq_to_message_format(dataset_path, tokenizer, max_length=512, dataset_size=-1):
+    """
+    Convert the generated thaiexam dataset to the message format.
+    """
     dataset = []
     for line in open(dataset_path, 'r', encoding='utf-8'):
         dataset.append(json.loads(line))
+    if dataset_size != -1:
+        dataset = dataset[:dataset_size]
+    for example in dataset:
+        choices = [f"{k}) {example['choices'][k]}" for k in example['choices'].keys() if example['choices'][k] is not None]
+        question_with_choices = f"{example['question']}\n" + "\n".join(choices)
+        answer_text = f"{example['answer']['explanation']} Answer: {example['answer']['label']}"
+        
+        messages = [
+            {"role": "user", "content": question_with_choices},
+            {"role": "assistant", "content": answer_text},
+        ]
+        
+        text = tokenizer.apply_chat_template(messages, tokenize=False)
+        original_tokens = tokenizer(text, truncation=False, return_tensors=None)["input_ids"]
+        original_length = len(original_tokens)
+        
+        tokenized = tokenizer(
+            text,
+            truncation=True,
+            max_length=max_length,
+            padding="max_length",
+            return_tensors=None
+        )
+        
+        labels = tokenized["input_ids"].copy()
+        user_text = tokenizer.apply_chat_template([{"role": "user", "content": question_with_choices}], tokenize=False, add_generation_prompt=True)
+        user_tokens = tokenizer(user_text, add_special_tokens=False, return_tensors=None)["input_ids"]
+        mask_until = len(user_tokens)
+        
+        for i in range(min(mask_until, len(labels))):
+            labels[i] = -100
+        
+        truncated_tokens = tokenized["input_ids"]
+        truncated_length = len(truncated_tokens)
+        truncated_text = tokenizer.decode(truncated_tokens, skip_special_tokens=False)
+        
+        yield {
+            "input_content_original": text,
+            "input_content_original_length": original_length,
+            "input_content_truncated": truncated_text,
+            "input_content_truncated_length": truncated_length,
+            "input_ids": tokenized["input_ids"],
+            "attention_mask": tokenized["attention_mask"],
+            "labels": labels,
+        }
+
+def generated_winogrande_to_message_format(dataset_path, tokenizer, max_length=512, dataset_size=-1):
+    dataset = []
+    for line in open(dataset_path, 'r', encoding='utf-8'):
+        dataset.append(json.loads(line))
+    if dataset_size != -1:
+        dataset = dataset[:dataset_size]
+    for example in dataset:
+        question = example['question']
+        answer_text = example['reference']['explanation']
+        choices = example['choices']
+        question_with_choices = f"Fill in the blanks with one of the provided options: {question}\n" + "\n".join(choices)
+        
+        messages = [
+            {"role": "user", "content": question_with_choices},
+            {"role": "assistant", "content": answer_text},
+        ]
+        
+        text = tokenizer.apply_chat_template(messages, tokenize=False)
+        original_tokens = tokenizer(text, truncation=False, return_tensors=None)["input_ids"]
+        original_length = len(original_tokens)
+        
+        tokenized = tokenizer(
+            text,
+            truncation=True,
+            max_length=max_length,
+            padding="max_length",
+            return_tensors=None
+        )
+        
+        labels = tokenized["input_ids"].copy()
+        user_text = tokenizer.apply_chat_template([{"role": "user", "content": question_with_choices}], tokenize=False, add_generation_prompt=True)
+        user_tokens = tokenizer(user_text, add_special_tokens=False, return_tensors=None)["input_ids"]
+        mask_until = len(user_tokens)
+        
+        for i in range(min(mask_until, len(labels))):
+            labels[i] = -100
+        
+        truncated_tokens = tokenized["input_ids"]
+        truncated_length = len(truncated_tokens)
+        truncated_text = tokenizer.decode(truncated_tokens, skip_special_tokens=False)
+        
+        yield {
+            "input_content_original": text,
+            "input_content_original_length": original_length,
+            "input_content_truncated": truncated_text,
+            "input_content_truncated_length": truncated_length,
+            "input_ids": tokenized["input_ids"],
+            "attention_mask": tokenized["attention_mask"],
+            "labels": labels,
+        }
+
+def generated_hellaswag_to_message_format(dataset_path, tokenizer, max_length=512, dataset_size=-1):
+
+    dataset = []
+    for line in open(dataset_path, 'r', encoding='utf-8'):
+        dataset.append(json.loads(line))
+    
+    if dataset_size != -1:
+        dataset = dataset[:dataset_size]
+
+    for example in dataset:
+        question = example['question']
+        choices = example['choices']
+        question_with_choices = f"{question}\nComplete the above statement with the following options:" + "\n".join(choices)
+        answer = example['reference']['explanation']
+        
+        messages = [
+            {"role": "user", "content": question_with_choices},
+            {"role": "assistant", "content": answer},
+        ]
+        
+        text = tokenizer.apply_chat_template(messages, tokenize=False)
+        original_tokens = tokenizer(text, truncation=False, return_tensors=None)["input_ids"]
+        original_length = len(original_tokens)
+        
+        tokenized = tokenizer(
+            text,
+            truncation=True,
+            max_length=max_length,
+            padding="max_length",
+            return_tensors=None
+        )
+        
+        labels = tokenized["input_ids"].copy()
+        user_text = tokenizer.apply_chat_template([{"role": "user", "content": question_with_choices}], tokenize=False, add_generation_prompt=True)
+        user_tokens = tokenizer(user_text, add_special_tokens=False, return_tensors=None)["input_ids"]
+        mask_until = len(user_tokens)
+        
+        for i in range(min(mask_until, len(labels))):
+            labels[i] = -100
+        
+        truncated_tokens = tokenized["input_ids"]
+        truncated_length = len(truncated_tokens)
+        truncated_text = tokenizer.decode(truncated_tokens, skip_special_tokens=False)
+        
+        yield {
+            "input_content_original": text,
+            "input_content_original_length": original_length,
+            "input_content_truncated": truncated_text,
+            "input_content_truncated_length": truncated_length,
+            "input_ids": tokenized["input_ids"],
+            "attention_mask": tokenized["attention_mask"],
+            "labels": labels,
+        }
+
+def generate_formatted_examples(dataset_path, tokenizer, max_length=512, dataset_size=-1):
+    dataset = []
+    for line in open(dataset_path, 'r', encoding='utf-8'):
+        dataset.append(json.loads(line))
+    if dataset_size != -1:
+        dataset = dataset[:dataset_size]
     
     for example in dataset:
         turns = example.get("turns", [])
@@ -114,9 +311,11 @@ def generate_formatted_examples(dataset_path, tokenizer, max_length=1024):
                 messages.append({"role": "assistant", "content": references[j]})
             messages.append({"role": "user", "content": turns[i]})
             messages.append({"role": "assistant", "content": references[i]})
+            
             text = tokenizer.apply_chat_template(messages, tokenize=False)
             original_tokens = tokenizer(text, truncation=False, return_tensors=None)["input_ids"]
             original_length = len(original_tokens)
+            
             tokenized = tokenizer(
                 text,
                 truncation=True,
@@ -124,9 +323,26 @@ def generate_formatted_examples(dataset_path, tokenizer, max_length=1024):
                 padding="max_length",
                 return_tensors=None
             )
+
+            labels = tokenized["input_ids"].copy()
+            
+            messages_before_last_response = []
+            for j in range(i):
+                messages_before_last_response.append({"role": "user", "content": turns[j]})
+                messages_before_last_response.append({"role": "assistant", "content": references[j]})
+            messages_before_last_response.append({"role": "user", "content": turns[i]})
+            
+            user_text = tokenizer.apply_chat_template(messages_before_last_response, tokenize=False, add_generation_prompt=True)
+            user_tokens = tokenizer(user_text, add_special_tokens=False, return_tensors=None)["input_ids"]
+            mask_until = len(user_tokens)
+            
+            for k in range(min(mask_until, len(labels))):
+                labels[k] = -100
+            
             truncated_tokens = tokenized["input_ids"]
             truncated_length = len(truncated_tokens)
             truncated_text = tokenizer.decode(truncated_tokens, skip_special_tokens=False)
+            
             yield {
                 "input_content_original": text,
                 "input_content_original_length": original_length,
@@ -134,13 +350,14 @@ def generate_formatted_examples(dataset_path, tokenizer, max_length=1024):
                 "input_content_truncated_length": truncated_length,
                 "input_ids": tokenized["input_ids"],
                 "attention_mask": tokenized["attention_mask"],
-                "labels": tokenized["input_ids"].copy()
+                "labels": labels
             }
 
 def parse_args():
     parser = argparse.ArgumentParser(description="SFT training with optional Unsloth optimization.")
     parser.add_argument('--use_unsloth', action='store_true', help='Use Unsloth for model loading and optimization')
     parser.add_argument("--extra_name", type=str, default="", help="Extra name to append to the wandb project name")
+    parser.add_argument("--dataset_size", type=int, default=10000, help="Size of the dataset to use")
     return parser.parse_args()
 
 args = parse_args()
@@ -221,19 +438,34 @@ def format_mtbench_for_sft_with_think(dataset_path, tokenizer, max_length=4096):
 
 # Create a list from the generator
 start_time = time.time()
-formatted_examples_mtbench_train_full = list(generate_formatted_examples(train_dataset_path, tokenizer, max_length = 512))
-#formatted_examples_mtbench_eng_train_full = list(generate_formatted_examples(eng_train_dataset_path, tokenizer, max_length = 512))
-formatted_examples_mtbench_val_full = list(generate_formatted_examples(val_dataset_path, tokenizer, max_length = 512))
-formatted_examples_thaiexam_train_full = list(generated_thaiexam_to_message_format(thaiexam_dataset_path, tokenizer, max_length = 512))
-formatted_examples_thaiexam_val_full = list(generated_thaiexam_to_message_format(thaiexam_val_dataset_path, tokenizer, max_length = 512))
 
-formatted_examples_train_full = formatted_examples_mtbench_train_full + formatted_examples_thaiexam_train_full# + formatted_examples_mtbench_eng_train_full
-formatted_examples_val_full = formatted_examples_mtbench_val_full + formatted_examples_thaiexam_val_full
+formatted_examples_eng_hellaswag_train_full = list(generated_hellaswag_to_message_format(hellaswag_en_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size))
+formatted_examples_thai_hellaswag_train_full = list(generated_hellaswag_to_message_format(hellaswag_thai_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size))
+formatted_examples_hellaswag_val_full = list(generated_hellaswag_to_message_format(hellaswag_val_dataset_path, tokenizer, max_length = 512, dataset_size = -1))
+formatted_examples_eng_mmlu_train_full = list(generated_mcq_to_message_format(mmlu_en_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size))
+formatted_examples_thai_mmlu_train_full = list(generated_mcq_to_message_format(mmlu_thai_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size))
+formatted_examples_mmlu_val_full = list(generated_mcq_to_message_format(mmlu_val_dataset_path, tokenizer, max_length = 512, dataset_size = -1))
+formatted_examples_thai_truthfulqa_train_full = list(generated_simple_question_to_message_format(truthfulqa_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size, language = 'thai'))
+formatted_examples_eng_truthfulqa_train_full = list(generated_simple_question_to_message_format(truthfulqa_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size, language = 'eng'))
+formatted_examples_truthfulqa_val_full = list(generated_simple_question_to_message_format(truthfulqa_val_dataset_path, tokenizer, max_length = 512, dataset_size = -1, language = "thai"))
+formatted_examples_eng_winogrande_train_full = list(generated_winogrande_to_message_format(winogrande_en_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size))
+formatted_examples_thai_winogrande_train_full = list(generated_winogrande_to_message_format(winogrande_thai_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size))
+formatted_examples_winogrande_val_full = list(generated_winogrande_to_message_format(winogrande_val_dataset_path, tokenizer, max_length = 512, dataset_size = -1))
+formatted_examples_eng_arc_train_full = list(generated_mcq_to_message_format(arc_en_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size))
+formatted_examples_thai_arc_train_full = list(generated_mcq_to_message_format(arc_thai_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size))
+formatted_examples_arc_val_full = list(generated_mcq_to_message_format(arc_val_dataset_path, tokenizer, max_length = 512, dataset_size = -1))
+formatted_examples_thai_gsm8k_train_full = list(generated_simple_question_to_message_format(gsm8k_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size, language = 'thai'))
+formatted_examples_eng_gsm8k_train_full = list(generated_simple_question_to_message_format(gsm8k_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size, language = 'eng'))
+formatted_examples_gsm8k_val_full = list(generated_simple_question_to_message_format(gsm8k_val_dataset_path, tokenizer, max_length = 512, dataset_size = -1, language = "thai"))
 
-# Save monitoring CSV
-#save_monitoring_csv(formatted_examples_full, output_csv=f"input_monitor-{run_id}.csv")
+formatted_examples_ifeval_train_full = list(generated_simple_question_to_message_format(ifeval_dataset_path, tokenizer, max_length = 512, dataset_size = args.dataset_size, language = 'thai'))
+formatted_examples_ifeval_val_full = list(generated_simple_question_to_message_format(ifeval_val_dataset_path, tokenizer, max_length = 512, dataset_size = -1, language = "thai"))
 
-# Build the list for Dataset.from_list
+
+formatted_examples_train_full = formatted_examples_ifeval_train_full + formatted_examples_eng_truthfulqa_train_full + formatted_examples_thai_truthfulqa_train_full + formatted_examples_eng_winogrande_train_full + formatted_examples_thai_winogrande_train_full + formatted_examples_eng_arc_train_full + formatted_examples_thai_arc_train_full + formatted_examples_eng_mmlu_train_full + formatted_examples_thai_mmlu_train_full + formatted_examples_eng_hellaswag_train_full + formatted_examples_thai_hellaswag_train_full + formatted_examples_eng_gsm8k_train_full + formatted_examples_thai_gsm8k_train_full
+
+formatted_examples_val_full = formatted_examples_ifeval_val_full + formatted_examples_truthfulqa_val_full + formatted_examples_winogrande_val_full + formatted_examples_arc_val_full + formatted_examples_mmlu_val_full + formatted_examples_hellaswag_val_full + formatted_examples_gsm8k_val_full
+
 formatted_examples_train = [
     {
         "input_ids": ex["input_ids"],
@@ -258,31 +490,31 @@ print(f"Time taken to prepare dataset: {end_time - start_time} seconds")
 # train_val_dataset = format_mtbench_for_sft_with_think(dataset_path, tokenizer, max_length=4096)
 #train_val_split = train_val_dataset.train_test_split(test_size=0.05, shuffle=False, seed=42)
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-# Training arguments
+
 training_args = SFTConfig(
-    output_dir="solar-pro-8.49b-harder-training-2",  
-    num_train_epochs=5,
-    per_device_train_batch_size=64, # 4
-    per_device_eval_batch_size=64,
-    gradient_accumulation_steps=1, #8
+    output_dir="solar-pro-8.49b-h5-all-dataset-training-faster-lr",  
+    num_train_epochs=1, 
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+    gradient_accumulation_steps=1,
     gradient_checkpointing=True,
     gradient_checkpointing_kwargs={"use_reentrant": True},
-    learning_rate=1e-4, #[1e-5, 2e-5, 3e-5, 5e-5]
-    lr_scheduler_type="linear",
-    weight_decay=0.03, #0.03
-    warmup_ratio=0.05,   
-    max_grad_norm=1.0,
+    learning_rate=1e-4,
+    lr_scheduler_type="cosine",
+    weight_decay=0.01,
+    warmup_ratio=0.1,
+    max_grad_norm=0.5, 
     eval_strategy="steps",
-    eval_steps=337,
+    eval_steps=125,
     save_strategy="steps",
-    save_steps=2359,
+    save_steps=1625, 
     logging_steps=10,
     logging_strategy="steps",
     #resume_from_checkpoint=None,
     bf16=True,
     fp16=False,
     report_to="wandb",
-    max_length = 1024,
+    max_length=512,
     run_name=run_name,
     remove_unused_columns=False,
     group_by_length=False,
@@ -300,6 +532,7 @@ trainer = SFTTrainer(
     train_dataset=train_dataset,
     eval_dataset=val_dataset,
     data_collator=data_collator,
+    processing_class=tokenizer,  # Explicitly pass tokenizer to avoid trust_remote_code issues
     #callbacks=[EarlyStoppingCallback(early_stopping_patience=3)]
 )
 """
@@ -347,10 +580,6 @@ config_dict = {
     "timestamp": datetime.now().isoformat(),
     "training_time": f"{training_time:.2f} seconds",
     "model_slug": model_slug,
-    "train_dataset_path": train_dataset_path,
-    "val_dataset_path": val_dataset_path,
-    "thaiexam_dataset_path": thaiexam_dataset_path,
-    "thaiexam_val_dataset_path": thaiexam_val_dataset_path,
     "training_arguments": {
         "output_dir": training_args.output_dir,
         "per_device_train_batch_size": training_args.per_device_train_batch_size,

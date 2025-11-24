@@ -1,0 +1,108 @@
+You are an expert AI curriculum designer specializing in common sense reasoning and contextual understanding. Your task is to generate high-quality instructional drills that train students to resolve ambiguous references and apply logical reasoning to fill-in-the-blank questions.
+
+**Your Goal:** Generate 1 unique drill question that teaches the reasoning skills needed to solve the Target Question below.
+
+---
+
+**Target Question:**
+- **Sentence:** {th_sentence}
+- **Option 1:** {th_option1}
+- **Option 2:** {th_option2}
+
+---
+
+### **Core Skills to Train**
+
+Focus on teaching ONE of these reasoning skills:
+
+1. **Attribute Reasoning** - Understanding which entity has which characteristics/properties based on context
+2. **Causal Reasoning** - Understanding cause-effect relationships and logical consequences
+3. **Contrast Recognition** - Identifying contrasting properties or situations between entities
+4. **Common Sense Physics** - Understanding physical properties, constraints, and interactions
+5. **Social/Emotional Understanding** - Reasoning about behaviors, feelings, and social dynamics
+6. **Temporal/Sequential Logic** - Understanding order of events and temporal relationships
+
+---
+
+### **Drill Design Instructions**
+
+**Your Task:** Create a question that asks the student to:
+1. Choose which option correctly fills the blank in the target sentence
+2. Explain WHY that option is correct based on the context
+3. Explain WHY the other option doesn't fit
+
+The question should:
+- Test understanding of the logical reasoning needed to resolve the ambiguity
+- Require the student to explain their reasoning process
+- Focus on the underlying principle (attribute, causality, contrast, etc.) that makes one option correct
+
+**Key Requirements:**
+- Focus on teaching REASONING PROCESS, not just answer identification
+- Explain the contextual clues that lead to the correct answer
+- Make explicit the logical connection between context and answer
+- Build transferable reasoning skills for similar ambiguity resolution tasks
+
+---
+
+### **Thai Language Quality Guidelines**
+
+- Write all content entirely in natural, fluent Thai
+- Use formal educational tone appropriate for advanced learners
+- Apply correct grammar and official terminology
+- Maintain clarity when explaining logical reasoning
+- Use Thai quotation marks and punctuation conventions
+
+---
+
+### **Generation Rules & Output Format**
+
+1. **Uniqueness and Diversity:** The drill MUST be a completely unique sentence/scenario from the target question - NOT a variation of it. Create a NEW sentence with a blank and two options that test the SAME REASONING SKILL but in a different context. This is crucial for SFT - the model cannot 'cheat' by looking at the exact same sentence. The new sentence should use completely different entities, actions, or situations.
+
+2. **Focus on Reasoning:** The drill should teach HOW to reason through the ambiguity using contextual clues, not just what the answer is.
+
+3. **Factual Correctness:** Ensure the reasoning explanation is logically sound and matches the correct answer.
+
+4. **Detailed Explanations:** Reference answer must:
+   - Identify which option is correct
+   - Explain the contextual clues that indicate the correct answer
+   - Explain why the other option doesn't fit
+   - Teach the general reasoning principle
+
+5. **JSON Output:** Your output MUST be a single, valid JSON object inside `<JSON_OUTPUT>` tags.
+
+---
+
+### **Internal Thought Process**
+
+Before generating, think through:
+
+1. **Identify Reasoning Type:** What type of reasoning is needed in the target? (attributes, causality, contrast, physical properties, social understanding, temporal sequence, etc.)
+
+2. **Identify Underlying Principle:** What is the core reasoning principle that would help solve both the target question and any new question about this skill?
+
+3. **Create DIFFERENT Sentence:** Write a completely NEW sentence with a different scenario that requires the SAME reasoning type. Use entirely different entities, actions, or situations - do NOT just rephrase or slightly modify the target sentence.
+
+4. **Design Two Options:** Create two options that:
+   - One makes logical sense given the contextual clues in the new sentence
+   - One would be a plausible but incorrect choice (testing the reasoning, not guessing)
+
+5. **Explain the Logic:** Why does the correct option fit the new sentence?
+
+6. **Write Reference Answer:** Structure it as:
+   - "คำตอบที่ถูกต้องคือ [option] เพราะ..." (The correct answer is [option] because...)
+   - "จากบริบท..." (From the context...)
+   - "ตัวเลือกอื่นไม่เหมาะสม เพราะ..." (The other option doesn't fit because...)
+
+7. **Self-Critique:** Is this sentence completely different from the target? Does it teach the same reasoning skill? Will a student who solves this also be better at the target question?
+
+---
+
+Generate the JSON object for 1 high-quality reasoning drill now:
+
+<JSON_OUTPUT>
+{
+    "question": "Single Thai question presenting the sentence with blank and two options, asking student to fill in the blank.",
+    "choices": ["first choice", "second choice"]
+    "reference": {"explanation": "A Thai explanation that gives the reasoning for the answer", "label": "The label for the answer, 1 if the answer is the first choice and 2 if the answer is the second choice"},
+}
+</JSON_OUTPUT>

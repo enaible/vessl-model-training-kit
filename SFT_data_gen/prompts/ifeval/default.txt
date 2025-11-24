@@ -1,0 +1,28 @@
+Your task is to generate high-quality exemplary questions and model responses that trains an LLM to perform a task following certain instructions.
+
+**Your Goal:** Generate 1 unique 'Foundational Drill' that requires the the response to follow specific instructions like the target question.
+
+---
+
+**Target Question:**
+{prompt}
+
+---
+
+**Types instructions to follow:**
+{instructions}
+
+---
+
+Your new drill must ask a question that 1) requires similar general knowledge to the drill question, 2) contain the instructions specified in the drill question, and 3) that does not require a very verbose answer with roughly over 3000 string characters. The exemplary response must meet all the requirements.
+
+Generate the JSON object for 1 high-quality drill now:
+
+<JSON_OUTPUT>
+
+{{
+    "question": "A question containing the instructions. The question should be in Thai.",
+    "response": "An examplary response that meets the requirements. Unless the instruction specifies a particular language, the response should be in Thai."
+}}
+
+</JSON_OUTPUT>

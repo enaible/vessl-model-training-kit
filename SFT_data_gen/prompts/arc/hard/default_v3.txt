@@ -1,0 +1,73 @@
+You are an expert tutor AI specializing in general scientific knowledge. Your primary goal is to create high-quality, educational drill sets for Generative Knowledge Distillation (GKD) and Supervised Fine-Tuning (SFT).
+
+### Drill Design Instructions
+You will be given a `target_question` from an existing benchmark along with four choices. Your task is to generate a new, related "drill" (a question and its answer) that helps a student build the foundational knowledge or reasoning skills required to solve the `target_question`.
+
+---
+
+- **Question:** {th_question}
+= **Choices:**  
+{th_text}
+
+---
+
+### **Drill Design Instructions**
+
+1.  **Analyze and Isolate Core Skill:** Analyze the Target Question to identify the skills and knowledge needed to solve the question. (e.g., a core knowledge in biology/physics/astronomy/chemistry/earth science). Create a new question that would also require the knowledge.
+2.  **Difficulty of the Question:** The drill questions must be the right difficulty to help the model achieve the depth of knowledge to solve the target question.
+3.  **Make four or five choices for the answer** The generated question may offer either four or five choices, with one of them being the right answer for the drill question. Try to make the wrong choices not so blatantly wrong for the right difficulty.
+4.  **Answer the question:** With a reasoning for why each choice is right/wrong, state the right answer. The label for the right answer (a, b, c, d, e) must be explicitly stated.
+
+---
+
+### **Thai Language Quality Guidelines**
+
+All drills must be written in high-quality, natural Thai, following correct grammar, official terminology, and cultural context suitable for educational material.
+
+---
+
+### **Generation Rules & Output Format**
+
+1.  **Originality:** Do NOT simply copy or rephrase the Target Question. Create a genuinely new task using different content, scenarios, or examples that test the SAME underlying skill. This is crucial for SFT - the model cannot 'cheat' by memorizing the exact same question. The drill must teach the skill using different subject matter or context.
+2.  **No Errors:** The drill must NOT contain incorrect code, ambiguous instructions, or flawed logic.
+3.  **JSON Output:** Your final output MUST be a single, valid JSON object (not array) inside `<JSON_OUTPUT>` tags with either 4 or 5 choices.
+
+**JSON Schema:**
+```json
+{{
+    "question": "A question in Thai that isolates the core knowledge",
+    "choices": {{
+        "a" : "The first choice for the answer",
+        "b" : "The second choice for the answer",
+        "c" : "The third choice for the answer",
+        "d" : "The fourth choice for the answer",
+        "e" : "The fifth choice for the answer" (optional)
+    }}
+    "answer": {{
+        "explanation": "Answer to the question in Thai with the label of the answer explicitly stated"
+        "label": "The label of the answer.
+        }},
+}}
+```
+
+---
+
+### **Internal Thought Process**
+
+1.  **Identify Core Concept:** What's the single most critical scientific concept or skill in the Target Question? (e.g., chemical reactions, photosynthesis, thermodynamics, evolutionary biology)
+2.  **Identify Underlying Principle:** What fundamental principle or knowledge does the student need to solve the target question?
+3.  **Design Different Drill:** Create a DIFFERENT question about the SAME concept/skill using entirely different examples, scenarios, or subject matter. Do NOT ask about the same topic as the target.
+4.  **Make Realistic Distractors:** Create wrong answers that represent common misconceptions students have about this concept.
+5.  **Self-Critique:** Does this drill test the same underlying skill but with completely different content? Will it help students understand the principle, not just memorize the answer?
+6.  **Finalize & Format:** Finalize the text in natural Thai and format it into the JSON schema.
+
+---
+
+Generate the JSON object for 1 high-quality practice drill now:
+<JSON_OUTPUT>
+{{
+    "question": ...,
+    "choices": [...],
+    "answer": ...,
+}}
+</JSON_OUTPUT> 

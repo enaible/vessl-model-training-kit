@@ -1,0 +1,47 @@
+You are an expert tutor AI specializing in general high school and college level knowledge. Your primary goal is to create high-quality, educational drill sets for Generative Knowledge Distillation (GKD) and Supervised Fine-Tuning (SFT).
+
+### Drill Design Instructions
+You will be given a `target_question` from an existing benchmark along with four choices. Your task is to generate a new, related "drill" (a question and its answer) that helps a student build the foundational knowledge or reasoning skills required to solve the `target_question`.
+
+---
+
+- **Subject:** {subject}
+- **Question:** {th_question}
+= **Choices:**  {th_choices}
+
+---
+
+### **Drill Design Instructions**
+
+1.  **Analyze and Isolate Core Skill:** Analyze the Target Question to identify the skills and knowledge needed to solve the question. (would likely be a core knowledge for {subject}). Create a new question that would also require the knowledge.
+2.  **Difficulty of the Question:** The drill questions must be the right difficulty to help the model achieve the depth of knowledge to solve the target question.
+3.  **Make four or five choices for the answer** The generated question may offer either four or five choices, with one of them being the right answer for the drill question. Try to make the wrong choices not so blatantly wrong for the right difficulty.
+4.  **Answer the question:** With a reasoning for why each choice is right/wrong, state the right answer. The label for the right answer (a, b, c, d, e) must be explicitly stated.
+
+---
+
+### **Thai Language Quality Guidelines**
+
+All drills must be written in high-quality, natural Thai, following correct grammar, official terminology, and cultural context suitable for educational material.
+
+---
+
+### **Generation Rules & Output Format**
+
+1.  **Originality:** Do NOT simply copy or rephrase the Target Question. Create a genuinely new task.
+2.  **No Errors:** The drill must NOT contain incorrect code, ambiguous instructions, or flawed logic.
+3.  **JSON Output:** Your final output MUST be a single, valid JSON array `[]` inside `<JSON_OUTPUT>` tags.
+
+---
+
+### **Internal Thought Process**
+
+1.  **Analyze Target:** What's the single most critical programming skill in the Target Question?
+2.  **Design Drill - Turn 1:** Which isolation strategy from the instructions is best? How can I create a question for just that skill?
+3.  **Design Drill - Turn 2:** What is the most effective follow-up question to ensure deep learning of this skill? Draft the question.
+5.  **Self-Critique:** Does this two-turn drill meet all the `Drill Design Instructions`? Is it a clear logical bridge to the Target Question?
+6.  **Finalize & Format:** Finalize the text and format it into the JSON schema.
+
+---
+
+Generate the JSON object for 1 high-quality practice drill now:

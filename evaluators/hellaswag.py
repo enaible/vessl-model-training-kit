@@ -5,12 +5,15 @@ import torch
 from tqdm import tqdm
 
 import wandb
-from dataset.arc import ARCDataset
+from dataset.hellaswag import HellaSwagDataset
+from evaluators.hf_run import process_mcq_answers
 from evaluators.api_run import process_answers
 from .base import BaseEvaluator
+import os
+import dotenv
+dotenv.load_dotenv()
 
-
-class ARCEvaluator(BaseEvaluator):
+class HellaSwagEvaluator(BaseEvaluator):
     def __init__(self, model_runner, wandb_config: Dict[str, Any], language: str = "tha"):
         super().__init__(model_runner, wandb_config)
         self.label_mapping = {0: "a", 1: "b", 2: "c", 3: "d", 4: "e", 5: "no_answer"}
@@ -18,7 +21,7 @@ class ARCEvaluator(BaseEvaluator):
             map(lambda x: self.label_mapping[x], self.label_mapping)
         )
         self.label_to_id_dict = {l: i for i, l in enumerate(self.label_names)}
-        self.label_to_id_dict.update({"1": 0, "2": 1, "3": 2, "4": 3, "5": 4, "-1": 5})
+        self.label_to_id_dict.update({"1": 0, "2": 1, "3": 2, "4": 3, "5": 4})
         ## Update just in case 1,2,3,4,5
         self.language = language
 
@@ -28,25 +31,23 @@ class ARCEvaluator(BaseEvaluator):
     async def _evaluate_subset(self, is_thinking: bool = False, start_index: int = 0, end_index: int = -1) -> Dict[str, Any]:
         inputs, preds, golds, llm_responses = [], [], [], []
         prompts, labels, choices = [], [], []
-        arc_dset = ARCDataset(subset = "default", split="test", language=self.language)
+        hellaswag_dset = HellaSwagDataset(language=self.language)
         if end_index == -1:
-            end_index = len(arc_dset)
-        arc_dset.dataset = arc_dset.dataset[start_index:end_index]
-        prompt_template = arc_dset.task
-        print(f"Processing ARC-challenge")
+            end_index = len(hellaswag_dset)
+        hellaswag_dset.dataset = hellaswag_dset.dataset[start_index:end_index]
+        prompt_template = hellaswag_dset.task
+        print(f"Processing HellaSwag")
         with torch.inference_mode():
-            for e, sample in tqdm(enumerate(arc_dset), total=len(arc_dset)):
+            for e, sample in tqdm(enumerate(hellaswag_dset), total=len(hellaswag_dset)):
                 if e < len(preds):
                     continue
 
                 prompt_text, label, choice = sample
                 prompts.append(prompt_text)
-                labels.append(
-                    self.label_to_id_dict[label] if type(label) == str else label
-                )
+                labels.append(int(label))
                 choices.append(choice)
                 # Batch Inference
-                if len(prompts) == 4 or e == len(arc_dset) - 1:
+                if len(prompts) == 4 or e == len(hellaswag_dset) - 1:
                     hyps = self.model_runner.predict_generation(
                         prompts,
                         is_thinking = is_thinking
@@ -57,6 +58,7 @@ class ARCEvaluator(BaseEvaluator):
                     else:
                         responses = hyps.get("responses", None)
                         model_responses = hyps.get("model_responses", None)
+
                     answers = await process_answers(responses, choices)
                     if model_responses is not None:
                         for prompt_text, hyp, label, model_response in zip(
@@ -80,19 +82,17 @@ class ARCEvaluator(BaseEvaluator):
                             golds.append(label)
                             llm_responses.append(response)
                         prompts, labels, choices = [], [], []
+                    intermediate_accuracy = self.calculate_metrics(golds, preds)["accuracy"]
+                    print(f"Intermediate Accuracy: {intermediate_accuracy}")
 
         metrics = self.calculate_metrics(golds, preds)
         metrics.update(
             {
-                "dataset": f"ARC-challenge",
+                "dataset": f"HellaSwag",
                 "prompt_id": "QA",
                 "prompt_lang": "English",
                 "prompt_template": prompt_template,
             }
-        )
-        # Log metrics
-        self.log_metrics(
-            "default", metrics, golds, preds, self.label_names, inputs
         )
         table_data = {
             "input": [],
@@ -110,8 +110,15 @@ class ARCEvaluator(BaseEvaluator):
             table_data["llm_response"].append(model_response)
             table_data["is_correct"].append(hyp == label)
         table = wandb.Table(data=pd.DataFrame(table_data))
-        wandb.log({f"ARC-challenge/table": table})
+        wandb.log({f"HellaSwag/table": table})
         # Log metrics
+        self.log_metrics(
+            "default", metrics, golds, preds, self.label_names, inputs
+        )
+
+
+        return metrics
+    
     def log_metrics(
         self,
         subset: str,

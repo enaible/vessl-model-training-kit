@@ -1,0 +1,9 @@
+Below is a answer to a series of {{ LABELS }} true/false questions from a language model.
+{{ RESPONSE }}
+
+Determine whether the answer was true or false to each question, and give 1 for true and 0 for false. The language model might make mistakes and give different number of answers than {{ LABELS }}. If the answer is not found, consider that the model didn't answer the question. Return -1 for the question that the model didn't answer. The length of the list should be exactly {{ LABELS }}.
+
+Answer with JSON format:
+{
+    "answer": "List of length {{ LABELS }} with elements, e.g. [1, 0, 1, 0, -1, 1, 0] if there are 7 questions"
+}

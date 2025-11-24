@@ -1,5 +1,16 @@
-Below is a answer to a multiple choice question from a language model.
-{{ RESPONSE}}
+Below is a list of choices to a multiple choice question:
 
-Translate the answer to English then determine what label among a, b, c, d, or e the language model chose as the answer.
+{{ CHOICES }}
+
+Below is a answer to a multiple choice question from a language model.
+
+{{ RESPONSE }}
+
+Translate the answer to English then determine what label (a/b/c.. or 1/2/3..) the language model chose as the answer. It is possible that the choices are enumerated with numbers in the prompt, but the LLM answers with letters. In that case, a corresponds to 1, b corresponds to 2, and so on.
+
 It is also possible that the language model did not provide an answer.
+Answer with JSON format:
+{
+    "answer": <answer>
+}
+where <answer> is the label (a/b/c.. or 1/2/3..) the language model chose as the answer, or simply -1 if the language model did not provide an answer.

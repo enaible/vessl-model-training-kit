@@ -1,0 +1,98 @@
+You are an expert AI curriculum designer specializing in common sense reasoning and logical narrative flow. Your task is to generate high-quality, two-turn instructional drills that train students to identify logically coherent continuations in text passages.
+
+**Your Goal:** Generate 1 unique 'Foundational Drill' that teaches ONE specific logical reasoning skill needed to solve the Target Scenario below.
+
+---
+
+**Target Scenario:**
+- **Context:** {th_ctx}
+- **Possible Endings:**
+{th_endings}
+
+---
+
+### **Core Skills to Train**
+
+Choose ONE of these logical flow skills to focus your drill on:
+
+1. **Coherence & Continuity** - Does the ending flow naturally from the context? Does it maintain topic consistency?
+
+2. **Plausibility & Practicality** - Is the continuation realistic and actionable? Does it make common sense?
+
+3. **Information Progression** - Does the ending add new, useful information without redundancy? Does it advance the narrative?
+
+4. **Cause-Effect Reasoning** - Does the ending logically follow from what was set up in the context? Are there implicit contradictions?
+
+5. **Specificity vs. Abstraction** - Does the level of detail match what's expected? If context is general, do substeps provide specifics?
+
+---
+
+### **Drill Design Instructions**
+
+The Drill Questions MUST be different from the target question. Do not make anything that resembles that target's specific scenario.
+
+**Drill Question Goal:** Present a focused question that isolates ONE of the core skills above. Use contrastive examples - show 3~5 endings (including correct and incorrect ones) and ask the student to identify one answer and WHY.
+
+**Key Requirements:**
+- Focus on LOGICAL FLOW reasoning, not surface features
+- Use explicit contrastive examples (good vs. bad)
+- Aim for challenging difficulty (80-90% complexity of original)
+
+---
+
+### **Thai Language Quality Guidelines**
+
+All drills must be written in high-quality, natural Thai, following correct grammar, official terminology, and cultural context suitable for educational material.
+
+---
+
+### **Generation Rules & Output Format**
+
+1. **Originality:** Create a NEW drill scenario. Do not just copy the target scenario. You may use the same context but must create your own comparison questions.
+
+2. **No Errors:** Ensure logical consistency. The correct answer must be genuinely correct with clear reasoning.
+
+3. **Explicit Reasoning:** Reference answers must explain the logical principles, not just state correctness.
+
+4. **JSON Output:** Your output MUST be a single, valid JSON object inside `<JSON_OUTPUT>` tags.
+
+```
+
+---
+
+### **Internal Thought Process**
+
+Before generating, think through:
+
+1. **Analyze Target Scenario:** What makes the correct ending right? What logical principle does it exemplify?
+
+2. **Identify Key Flaw in Wrong Endings:** Pick 2-4 wrong endings. What specific logical errors do they make? (redundancy? implausibility? structural mismatch? off-topic?)
+
+3. **Choose Core Skill:** Which of the 5 core skills best captures the distinction? Focus the drill on teaching that ONE skill.
+
+4. **Design Drill Question:** Create a comparison question using actual endings from the target. Ask student to identify the better one and explain the logical flow difference.
+
+5. **Write Reference Answers:** Provide thorough explanations that teach the logical reasoning pattern explicitly. Use phrases like:
+   - "มีความสอดคล้อง..." (coherent because...)
+   - "ขาดความต่อเนื่องทางตรรกะ..." (lacks logical continuity because...)
+   - "ส่งต่อข้อมูลโดย..." (progresses information by...)
+   - "ขัดแย้งกับบริบทใน..." (contradicts the context in terms of...)
+
+6. **Self-Critique:** Does this drill teach a generalizable skill for identifying logical flow? Will solving this drill genuinely help with the target scenario?
+
+---
+
+Generate the JSON object for 1 high-quality logical flow drill now:
+
+<JSON_OUTPUT>
+[
+{
+    "question": "Thai sentence that is to be followed by one of the choices",
+    "choices": ["The first choice", "The second choice", "The third choice", "The fourth choice (Optional)", "The fifth choice (Optional)"],
+    "reference": {
+        "explanation": "Thai explanation for the correct choice",
+        "label": "The label of the answer (1 ~ 5)"
+        },
+}
+]
+</JSON_OUTPUT>

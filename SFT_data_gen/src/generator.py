@@ -16,6 +16,7 @@ from utils import (
     load_existing_data, save_data_item, get_category_counts,
     calculate_remaining_per_category, create_output_path,
     create_backup_if_exists
+
 )
 from prompt_builder import PromptBuilder
 from chunker import TokenChunker
@@ -28,13 +29,18 @@ import os
 class DrillGenerator:
     """Main drill generation class."""
     
-    def __init__(self, config: Config, dataset: str, difficulty: str):
+    def __init__(self, config: Config, dataset: str, difficulty: str, language: str):
         self.config = config
         self.logger = setup_logging(config.log_level)
         self.api_client = config.api_client
         self.dataset = dataset
         self.difficulty = difficulty
+        self.language = language
         # OpenAI client setup
+        self.client = None  # Initialize to None first
+        self.url = None
+        self.api_key = None
+        self.headers = None
         if self.api_client == "openai":
             self.url = 'https://api.openai.com/v1/chat/completions'
             self.api_key = os.environ.get("OPENAI_API_KEY")
@@ -51,6 +57,14 @@ class DrillGenerator:
                 "Content-Type": "application/json",
             }
             self.client = OpenAI(base_url=f"{endpoint}", api_key=os.environ.get("AZURE_OPENAI_API_KEY"))
+        
+        elif self.api_client == "vessl":
+            self.url = "http://211.188.81.250:32759/v1/chat/completions"
+
+            self.headers = {
+                "Content-Type": "application/json"
+            }
+            self.client = None
         
         if difficulty == "easy":
             self.prompt_builder = PromptBuilder(config.category_easy_prompt_map)
@@ -75,6 +89,7 @@ class DrillGenerator:
         if config.enable_batch_mode:
             self.batch_generator = BatchDrillGenerator(
                 self.dataset,
+                self.language,
                 self.prompt_builder,
                 self.config, 
                 self.token_tracker,
@@ -121,6 +136,7 @@ class DrillGenerator:
                 source_items=source_items[processed:processed + current_batch_size],
                 start_index=start_index + processed,
                 count=current_batch_size,
+                language=self.language
             )
 
             batch_results, failed_count = await self.batch_generator.generate_batch(batch_request)
@@ -295,8 +311,8 @@ class DrillGenerator:
 async def main():
     """Main execution function."""
     parser = argparse.ArgumentParser(description=f"Generate drill dataset")
-    parser.add_argument("--dataset", default="thai_mtbench", help="Dataset name")
-    parser.add_argument("--subject", default="all", help="Subject name")
+    parser.add_argument("--dataset", default="gsm8k", help="Dataset name")
+    parser.add_argument("--subject", default="default", help="Subject name")
     parser.add_argument("--difficulty", default = "hard", help="Difficulty level")
     parser.add_argument("--backup", action="store_true", help="Create backup of existing data before starting")
     parser.add_argument("--force-new", action="store_true", help="Start fresh generation (ignores existing data)")
@@ -310,22 +326,13 @@ async def main():
     dataset = args.dataset.lower().replace(" ", "_")
     difficulty = args.difficulty.lower()
     subject = args.subject.lower().replace(" ", "_")
-    if dataset not in ["thai_mtbench", "thaiexam"]:
-        print("Invalid dataset. Choose between thai_mtbench, thaiexam.", dataset)
+    if dataset not in ["arc", "gsm8k", "hellaswag", "mmlu", "truthfulqa", "winogrande"]:
+        print("Invalid dataset. Choose between arc, gsm8k, hellaswag, mmlu, truthfulqa, and winogrande.", dataset)
         return
-    elif dataset == "thai_mtbench":
-        if subject not in ["all", "extraction", "knowledge_iii", "math", "reasoning", "roleplay", "social_science", "stem", "writing"]:
-            print("Invalid subject. Choose between\n1.all\n2.Extraction\n3.Knowledge III\n4.Math\n5.Reasoning\n6.Roleplay\n7.Social Science\n8.STEM\n9.Writing.", args.subject)
-            return
 
     # Load configuration
-    if "mtbench" in dataset and subject == "all":
-        config = load_config(f"config/{dataset}/default.yaml")
-    elif "mtbench" in args.dataset:
-            config = load_config(f"config/{dataset}/{subject}.yaml")
-    else:
-        config = load_config(f"config/{dataset}/default.yaml")
-
+    config = load_config(f"config/{dataset}/default.yaml")
+    
     difficulty = args.difficulty.lower()
     if difficulty not in ["easy", "hard"]:
         print("Invalid difficulty level. Choose between easy and hard.", difficulty)
@@ -388,7 +395,7 @@ async def main():
         print(f"🆕 Starting new generation to {output_path}")
     
     # Initialize generator
-    generator = DrillGenerator(config, dataset, difficulty)
+    generator = DrillGenerator(config, dataset, difficulty, "Thai")
     
     # Run generation
     await generator.generate_all_drills(output_path)

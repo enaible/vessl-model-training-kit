@@ -1,0 +1,39 @@
+### **Batch Generation Instructions**
+
+You need to generate **{{ count }} distinct drill problems** based on the {{ count }} target questions provided below.
+
+{{ target_questions | join(' ') }}
+
+### **Output Format Requirements**
+
+Respond with a JSON array containing exactly {{ count }} drill objects:
+
+```json
+[
+{
+    "question": "Single Thai question presenting the sentence with blank and two options, asking student to fill in the blank.",
+    "choices": ["first choice", "second choice"],
+    "reference": {"explanation": "A Thai explanation that gives the reasoning for the answer", "label": "The label for the answer, 1 if the answer is the first choice and 2 if the answer is the second choice"},
+},
+{
+    "question": "Single Thai question presenting the sentence with blank and two options, asking student to fill in the blank.",
+    "choices": ["first choice", "second choice"],
+    "reference": {"explanation": "A Thai explanation that gives the reasoning for the answer", "label": "The label for the answer, 1 if the answer is the first choice and 2 if the answer is the second choice"},
+},
+...
+]
+```
+
+### **Quality Requirements for Each Drill**
+
+- Each drill must be **independent** and **complete**
+- Maintain **consistent quality** across all {{ count }} drills
+- Each drill should be **at least 90% complexity** of its target question
+- All text must be in **high-quality Thai**
+
+### **Important Notes**
+
+- Generate **exactly {{ count }} drills** - no more, no less
+- Each drill corresponds to its respective target question in order
+- Maintain the same high quality standards for all drills
+- Use proper JSON formatting with valid syntax

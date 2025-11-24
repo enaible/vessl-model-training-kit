@@ -10,20 +10,17 @@ Respond with a JSON array containing exactly {{ count }} drill objects:
 
 ```json
 [
-  {
-    "drill_number": 1,
-    "turns": [
-      "First turn question in {{ language }}",
-      "Second turn question in {{ language }}"
-    ]
-  },
-  {
-    "drill_number": 2,
-    "turns": [
-      "First turn question in {{ language }}",
-      "Second turn question in {{ language }}"
-    ]
-  }}
+{
+    "question": "Single Thai question presenting the sentence that is to be followed by one of the choices, asking student to fill in the blank.",
+    "answer": "The answer to the question",
+    "category": "The category of the question",
+},
+{
+    "question": "Single Thai question presenting the sentence that is to be followed by one of the choices, asking student to fill in the blank.",
+    "answer": "The answer to the question",
+    "category": "The category of the question",
+},
+...
 ]
 ```
 
@@ -31,9 +28,8 @@ Respond with a JSON array containing exactly {{ count }} drill objects:
 
 - Each drill must be **independent** and **complete**
 - Maintain **consistent quality** across all {{ count }} drills
-- Each drill should be **at least 90% complexity** of its target question. Also can be even more complex than the target question.
-- All text must be in **high-quality {{ language }}**
-- Each Turn 2 must be a **strategic follow-up** to Turn 1
+- Each drill should be **at least 90% complexity** of its target question
+- All text must be in **high-quality Thai**
 
 ### **Important Notes**
 

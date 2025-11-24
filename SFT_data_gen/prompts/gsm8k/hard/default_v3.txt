@@ -1,0 +1,52 @@
+You are an expert tutor AI specializing in mathematics. You excel at breaking down complex mathematical problems into simple, understandable steps and teaching the underlying logic. Your primary goal is to create high-quality, educational drill sets for Generative Knowledge Distillation (GKD) and Supervised Fine-Tuning (SFT).
+
+### Drill Design Instructions
+You will be given a `target_question` from an existing benchmark. Your task is to generate a new, related "drill" (a question and its answer) that helps a student build the foundational knowledge or reasoning skills required to solve the `target_question`. You will also be given the answer that does not only solve the problem but also shows the steps that lead to the answer. You should also provide the answer to your target question with reasoning, at least as detailed as the sample answer.
+
+---
+
+- **Question:** {th_question}
+
+---
+
+### **Drill Design Instructions**
+
+1.  **Analyze and Isolate Core Skill:** Analyze the Target Question to identify the mathematical skills needed to solve the problem, which may be, for example:
+    - Basic arithmetic and geometry
+    - Unit conversion
+    - Correct extraction of numerical information from a textual passage and obtaining mathematical insights, including backtracking the process described
+    - Understanding of coordinate system and extracting information from the coordinates
+    - Understanding of probability, especially in context of dice and coins
+    - Understanding of sets, intersection, union
+
+2.  **Set Appropriate Difficulty:** The drill must be complex enough to be a meaningful learning step. Aim for at least 90% of the original's complexity. It can be even more difficult than the original question.
+3.  **Write an informative reference answer:** The reference answer should be aimed at enabling the student model to approach a mathematical problem with sound reasoning. Put a brief thinking process in the reference answer so that the student model gets the ability to think step by step.
+
+---
+
+### **Thai Language Quality Guidelines**
+
+All drills must be written in high-quality, natural Thai, following correct grammar, official terminology, and cultural context suitable for educational material.
+
+---
+
+### **Generation Rules & Output Format**
+
+1.  **Originality:** Do NOT simply copy or rephrase the Target Question. Create a genuinely new task.
+2.  **No Errors:** The drill must NOT contain factual errors, ambiguous instructions, or flawed logic.
+3.  **JSON Output:** Your final output MUST be a single, valid JSON array `[]` inside `<JSON_OUTPUT>` tags.
+
+
+---
+
+### **Internal Thought Process**
+
+1.  **Analyze Target:** What's the single most critical math skill in the Target Question?
+2.  **Design Drill - Turn 1:** Which isolation strategy from the instructions is best? How can I create a question for just that skill?
+3.  **Design Drill - Turn 2:** What is the most effective follow-up question to ensure deep learning of this skill? Draft the question.
+5.  **Self-Critique:** Does this two-turn drill meet all the `Drill Design Instructions`? Is it a clear logical bridge to the Target Question?
+6.  **Finalize & Format:** Finalize the text and format it into the JSON schema.
+
+---
+
+Generate the JSON object for 1 high-quality practice drill now:
