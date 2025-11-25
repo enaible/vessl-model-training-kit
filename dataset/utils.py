@@ -12,8 +12,12 @@ class Choice(BaseModel):
 class Example(BaseModel):
     question: str
     choices: List[Choice]
-    answer: str
+    answer: str | int
 
+class LayeredExample(BaseModel):
+    question: str
+    choices: List[Choice]
+    answer: List[int]
 
 # === Utility Functions ===
 def item2model(item: dict) -> Example:
