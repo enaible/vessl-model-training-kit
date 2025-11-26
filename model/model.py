@@ -124,7 +124,7 @@ class ChatMessage:
 
 class AbsModel(abc.ABC):
 
-    def __init__():
+    def __init__(self):
         pass
 
     def predict_classification(
@@ -382,7 +382,7 @@ class VLLMModel(AbsModel):
 
         # Get GPU memory utilization from environment variable or use default
         if gpu_memory_utilization is None:
-            gpu_memory_utilization = float(os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.45"))
+            gpu_memory_utilization = float(os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.75"))
         
         print(f"Initializing vLLM with {tensor_parallel_size} GPU(s)...")
         print(f"GPU memory utilization: {gpu_memory_utilization}")
@@ -528,7 +528,7 @@ def load_vllm_model_runner(model_name: str, max_model_len: int = 4096, tensor_pa
         max_model_len: Maximum sequence length (default: 4096)
         tensor_parallel_size: Number of GPUs to use (default: auto-detect)
         use_solar_moe: If True, use custom SolarPro MOE vLLM implementation (default: False)
-        gpu_memory_utilization: GPU memory utilization ratio (0.0-1.0). If None, uses VLLM_GPU_MEMORY_UTILIZATION env var or default 0.45
+        gpu_memory_utilization: GPU memory utilization ratio (0.0-1.0). If None, uses VLLM_GPU_MEMORY_UTILIZATION env var or default 0.75
 
     Returns:
         VLLMModel instance
