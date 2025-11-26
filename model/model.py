@@ -383,8 +383,11 @@ class VLLMModel(AbsModel):
 
         # Initialize vLLM engine
         # Note: For SolarPro MOE, disable prefix caching as per README recommendations
+        # Explicitly set runner and convert to avoid auto-detection issues
         self.llm = LLM(
             model=model_name_or_path,
+            runner="generate",  # Explicitly use generate runner for causal LM
+            convert="none",  # Don't convert to embedding/classification model
             tensor_parallel_size=tensor_parallel_size,
             distributed_executor_backend="mp",
             gpu_memory_utilization=0.75,
@@ -393,7 +396,7 @@ class VLLMModel(AbsModel):
             trust_remote_code=True,
             max_num_batched_tokens=max_model_len,
             max_num_seqs=64,
-            enable_chunked_prefill=True,
+            enable_chunked_prefill=False,  # Disable for Solar MoE compatibility
             enforce_eager=True,  # Disable CUDA graph capture for MoE compatibility (torch.where incompatible with graphs)
             disable_custom_all_reduce=False,
             enable_prefix_caching=False,  # Disable prefix caching for SolarPro MOE (as per README)
