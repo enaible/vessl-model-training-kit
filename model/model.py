@@ -1,5 +1,6 @@
 import abc
 import dataclasses
+import os
 from dataclasses import dataclass
 from typing import List, Optional, Union
 import numpy as np
@@ -371,7 +372,7 @@ class HFModel(AbsModel):
 class VLLMModel(AbsModel):
     """vLLM-based model for high-throughput batch inference."""
 
-    def __init__(self, model_name_or_path: str, max_model_len: int = 4096, tensor_parallel_size: int = None):
+    def __init__(self, model_name_or_path: str, max_model_len: int = 4096, tensor_parallel_size: int = None, gpu_memory_utilization: float = None):
         if not VLLM_AVAILABLE:
             raise ImportError("vLLM is not installed. Install with: pip install vllm")
 
@@ -379,7 +380,12 @@ class VLLMModel(AbsModel):
         if tensor_parallel_size is None:
             tensor_parallel_size = torch.cuda.device_count() if torch.cuda.is_available() else 1
 
+        # Get GPU memory utilization from environment variable or use default
+        if gpu_memory_utilization is None:
+            gpu_memory_utilization = float(os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.45"))
+        
         print(f"Initializing vLLM with {tensor_parallel_size} GPU(s)...")
+        print(f"GPU memory utilization: {gpu_memory_utilization}")
 
         # Initialize vLLM engine
         # Note: For SolarPro MOE, disable prefix caching as per README recommendations
@@ -390,7 +396,7 @@ class VLLMModel(AbsModel):
             convert="none",  # Don't convert to embedding/classification model
             tensor_parallel_size=tensor_parallel_size,
             distributed_executor_backend="mp",
-            gpu_memory_utilization=0.75,
+            gpu_memory_utilization=gpu_memory_utilization,
             max_model_len=max_model_len,
             dtype="bfloat16",
             trust_remote_code=True,
@@ -514,7 +520,7 @@ def load_llama_model_runner(model_name: str, fast=False):
     return model_runner
 
 
-def load_vllm_model_runner(model_name: str, max_model_len: int = 4096, tensor_parallel_size: int = None, use_solar_moe: bool = False):
+def load_vllm_model_runner(model_name: str, max_model_len: int = 4096, tensor_parallel_size: int = None, use_solar_moe: bool = False, gpu_memory_utilization: float = None):
     """Load a model using vLLM for high-throughput batch inference.
 
     Args:
@@ -522,6 +528,7 @@ def load_vllm_model_runner(model_name: str, max_model_len: int = 4096, tensor_pa
         max_model_len: Maximum sequence length (default: 4096)
         tensor_parallel_size: Number of GPUs to use (default: auto-detect)
         use_solar_moe: If True, use custom SolarPro MOE vLLM implementation (default: False)
+        gpu_memory_utilization: GPU memory utilization ratio (0.0-1.0). If None, uses VLLM_GPU_MEMORY_UTILIZATION env var or default 0.45
 
     Returns:
         VLLMModel instance
@@ -543,4 +550,4 @@ def load_vllm_model_runner(model_name: str, max_model_len: int = 4096, tensor_pa
         setup_solar_moe()
         print("✓ SolarPro MOE vLLM registered")
 
-    return VLLMModel(model_name, max_model_len=max_model_len, tensor_parallel_size=tensor_parallel_size)
+    return VLLMModel(model_name, max_model_len=max_model_len, tensor_parallel_size=tensor_parallel_size, gpu_memory_utilization=gpu_memory_utilization)

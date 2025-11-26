@@ -31,7 +31,18 @@ def parse_args():
         "--dataset",
         type=str,
         default="ifeval",
-        choices=["thaiexam", "arc", "xlsum", "mtbench", "hellaswag", "gsm8k", "mmlu", "truthfulqa", "winogrande", "ifeval"],  # Add more datasets here as they become available
+        choices=[
+        "thaiexam",
+         "arc",
+         "xlsum",
+         "mtbench",
+         "hellaswag",
+         "gsm8k",
+         "mmlu",
+         "truthfulqa",
+         "winogrande",
+         "ifeval"
+        ],  # Add more datasets here as they become available
         help="Dataset to evaluate on",
     )
     parser.add_argument(
