@@ -11,20 +11,22 @@ project_root = Path(__file__).parent.absolute()
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
+# Load environment variables BEFORE importing modules that depend on settings
+import dotenv
+dotenv.load_dotenv()
+
 import torch
 import wandb
 from evaluators import get_evaluator
 from model.model import load_model_runner, load_vllm_model_runner
 from model.llama_model import load_llama_model_runner
-import dotenv
-dotenv.load_dotenv()
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate model on datasets")
     parser.add_argument(
         "--model_id",
         type=str,
-        default="/root/nas/vessl-ai-kt/solar-pro-8.49b-h5-all-dataset-training-faster-lr/checkpoint-6500/",
+        default="/root/nas/updated_final_model/",
         help="Model ID to evaluate (e.g., scb10x/llama3.1-typhoon2-8b)",
     )
     parser.add_argument(
@@ -84,15 +86,15 @@ def parse_args():
     parser.add_argument(
         "--use_vllm",
         type=bool,
-        default = False,
+        default = True,
         help="Use vLLM for high-throughput batch inference (recommended for production)",
     )
 
     parser.add_argument(
         "--max_model_len",
         type=int,
-        default=512,
-        help="Maximum sequence length for vLLM (default: 512)",
+        default=2048,
+        help="Maximum sequence length for vLLM (default: 2048)",
     )
 
     parser.add_argument(
@@ -105,8 +107,8 @@ def parse_args():
     parser.add_argument(
         "--use_solar_moe",
         type=bool,
-        default=False,
-        help="Use custom SolarPro MOE vLLM implementation (for vessl/thai-tmai model)",
+        default=True,
+        help="Using SolarPro MOE model (Toggles the vLLM to use wrapper from vessl/thai-tmai model)",
     )
 
     parser.add_argument(
@@ -135,6 +137,37 @@ def parse_args():
 async def main():
     args = parse_args()
     start_time = time.time()
+
+    # Clear GPU memory before starting (important for debug mode)
+    if torch.cuda.is_available():
+        print("Clearing GPU memory before evaluation...")
+        torch.cuda.empty_cache()
+        gc.collect()
+        torch.cuda.empty_cache()
+        
+        # Report GPU memory status
+        for i in range(torch.cuda.device_count()):
+            allocated = torch.cuda.memory_allocated(i) / 1024**3  # GB
+            reserved = torch.cuda.memory_reserved(i) / 1024**3  # GB
+            total = torch.cuda.get_device_properties(i).total_memory / 1024**3  # GB
+            free = total - reserved
+            current_pid = os.getpid()
+            
+            print(f"GPU {i}: {allocated:.2f} GB allocated, {reserved:.2f} GB reserved, {free:.2f} GB free (of {total:.2f} GB total)")
+            print(f"  Current process PID: {current_pid}")
+            
+            if free < 1.0:
+                print(f"⚠️  WARNING: GPU {i} has only {free:.2f} GB free. This may cause OOM errors.")
+                print("   Possible causes:")
+                print("   1. Previous run didn't clean up (restart debugger)")
+                print("   2. Debugger holding memory from previous session")
+                print("   3. Another process using GPU (check with: nvidia-smi)")
+                print("   Solutions:")
+                print("   - Restart the debugger/IDE")
+                print("   - Reduce gpu_memory_utilization")
+                print("   - Use fewer GPUs (--tensor_parallel_size 2 or 1)")
+                print("   - Kill other processes: fuser -v /dev/nvidia*")
+        print()
 
     # Load model based on the specified backend
     if args.use_vllm:
@@ -186,7 +219,7 @@ async def main():
     elif args.dataset == "thaiexam":
         metrics = await evaluator.evaluate(args.subsets, args.is_thinking, args.start_index, args.end_index)
     elif args.dataset == 'mtbench':
-        metrics = evaluator.evaluate(args.subsets, args.is_thinking, args.start_index, args.end_index)
+        metrics = evaluator.evaluate(args.subsets, args.is_thinking)
     elif args.dataset == 'arc':
         metrics = await evaluator.evaluate(args.is_thinking, args.start_index, args.end_index)
     elif args.dataset == 'hellaswag':
