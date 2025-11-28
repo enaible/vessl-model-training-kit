@@ -1,5 +1,11 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+from pathlib import Path
+
+
+# Get the project root directory (where .env file is located)
+_project_root = Path(__file__).parent.absolute()
+_env_file = _project_root / ".env"
 
 
 class Settings(BaseSettings):
@@ -12,7 +18,7 @@ class Settings(BaseSettings):
     VESSL_URL: str
 
     model_config = SettingsConfigDict(
-        env_file=".env", # Load from .env file in the project root
+        env_file=str(_env_file),  # Use absolute path to .env file
         env_file_encoding="utf-8",
         case_sensitive=False,  # Allow case-insensitive environment variable matching
         extra="ignore"  # Ignore extra fields in .env that aren't defined in the model

@@ -130,7 +130,7 @@ class MMLUEvaluator(BaseEvaluator):
                 )
                 choices.append(choice)
                 # Batch Inference
-                if len(prompts) == 4 or e == len(mmlu_dset) - 1:
+                if len(prompts) == 1 or e == len(mmlu_dset) - 1:
                     hyps = self.model_runner.predict_generation(
                         prompts,
                         is_thinking = is_thinking
@@ -164,7 +164,8 @@ class MMLUEvaluator(BaseEvaluator):
                             golds.append(label)
                             llm_responses.append(response)
                         prompts, labels, choices = [], [], []
-
+                    intermediate_accuracy = self.calculate_metrics(golds, preds)["accuracy"]
+                    print(f"Intermediate Accuracy: {intermediate_accuracy}")
         # Calculate metrics with category breakdown
         metric_results, judge_results = self.calculate_result(golds, preds, inputs, mmlu_dset.dataset, llm_responses)
         metric_results.update(

@@ -26,13 +26,13 @@ def parse_args():
     parser.add_argument(
         "--model_id",
         type=str,
-        default="/root/nas/updated_final_model/",
+        default="/root/nas/updated_final_model",
         help="Model ID to evaluate (e.g., scb10x/llama3.1-typhoon2-8b)",
     )
     parser.add_argument(
         "--dataset",
         type=str,
-        default="ifeval",
+        default="arc",
         choices=[
         "thaiexam",
          "arc",
@@ -127,7 +127,7 @@ def parse_args():
     parser.add_argument(
         "--language",
         type=str,
-        default="tha",
+        default="en",
         help="Language to evaluate on",
     )
 

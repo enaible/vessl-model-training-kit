@@ -46,7 +46,8 @@ class MTBenchEvaluator:
         model_runner,
         wandb_config: Dict[str, Any],
         judge_num_workers=8,
-        settings: Settings = load_settings()
+        settings: Settings = load_settings(),
+        language: str = "thai"
     ) -> None:
         self.data_path = "ThaiLLM-Leaderboard/mt-bench-thai"
         self.judge_num_workers = judge_num_workers

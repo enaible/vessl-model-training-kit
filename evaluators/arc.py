@@ -46,7 +46,7 @@ class ARCEvaluator(BaseEvaluator):
                 )
                 choices.append(choice)
                 # Batch Inference
-                if len(prompts) == 4 or e == len(arc_dset) - 1:
+                if len(prompts) == 1 or e == len(arc_dset) - 1:
                     hyps = self.model_runner.predict_generation(
                         prompts,
                         is_thinking = is_thinking
@@ -80,6 +80,8 @@ class ARCEvaluator(BaseEvaluator):
                             golds.append(label)
                             llm_responses.append(response)
                         prompts, labels, choices = [], [], []
+                    intermediate_accuracy = self.calculate_metrics(golds, preds)["accuracy"]
+                    print(f"Intermediate Accuracy: {intermediate_accuracy}")
 
         metrics = self.calculate_metrics(golds, preds)
         metrics.update(

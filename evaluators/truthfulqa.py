@@ -39,7 +39,7 @@ class TruthfulQAEvaluator(BaseEvaluator):
                 )
 
                 # Batch Inference
-                if len(prompts) == 4 or e == len(truthfulqa_dset) - 1:
+                if len(prompts) == 1 or e == len(truthfulqa_dset) - 1:
                     hyps = self.model_runner.predict_generation(
                         prompts,
                         is_thinking = is_thinking

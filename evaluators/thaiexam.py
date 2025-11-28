@@ -13,7 +13,7 @@ from .base import BaseEvaluator
 
 
 class ThaiExamEvaluator(BaseEvaluator):
-    def __init__(self, model_runner, wandb_config: Dict[str, Any]):
+    def __init__(self, model_runner, wandb_config: Dict[str, Any], language: str = "tha"):
         super().__init__(model_runner, wandb_config)
         self.label_mapping = {0: "a", 1: "b", 2: "c", 3: "d", 4: "e", 5: "Could not answer"}
         self.label_names = list(

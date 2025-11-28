@@ -47,7 +47,7 @@ class HellaSwagEvaluator(BaseEvaluator):
                 labels.append(int(label))
                 choices.append(choice)
                 # Batch Inference
-                if len(prompts) == 4 or e == len(hellaswag_dset) - 1:
+                if len(prompts) == 1 or e == len(hellaswag_dset) - 1:
                     hyps = self.model_runner.predict_generation(
                         prompts,
                         is_thinking = is_thinking

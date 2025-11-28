@@ -87,7 +87,7 @@ class WinograndeEvaluator(BaseEvaluator):
                 choices.append(choice)
 
                 # Batch Inference
-                if len(prompts) == 4 or e == len(winogrande_dset) - 1:
+                if len(prompts) == 1 or e == len(winogrande_dset) - 1:
                     hyps = self.model_runner.predict_generation(
                         prompts,
                         is_thinking = is_thinking
@@ -120,7 +120,7 @@ class WinograndeEvaluator(BaseEvaluator):
                             golds.append(label)
                             llm_responses.append(response)
                         prompts, labels, choices = [], [], []
-
+                    
         metrics, judge_results = self.calculate_metrics(golds = golds, preds = preds, inputs = inputs, llm_responses = llm_responses)
         metrics.update(
             {

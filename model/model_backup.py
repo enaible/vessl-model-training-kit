@@ -388,6 +388,7 @@ class VLLMModel(AbsModel):
             tensor_parallel_size = torch.cuda.device_count() if torch.cuda.is_available() else 1
 
         # Get GPU memory utilization from environment variable or use default
+        # Use lower default (0.65) for better stability with large models
         if gpu_memory_utilization is None:
             gpu_memory_utilization = float(os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.75"))
         
@@ -423,17 +424,6 @@ class VLLMModel(AbsModel):
         self.model_name = model_name_or_path
         self.max_generation_length = MAX_GENERATION_LENGTH
         self.model_max_length = max_model_len
-
-        # Verify tokenizer alignment (optional debug check)
-        # vLLM's tokenizer is accessible via: self.llm.llm_engine.tokenizer.tokenizer
-        # Uncomment below to compare tokenizers if issues persist
-        # try:
-        #     vllm_tokenizer = self.llm.llm_engine.tokenizer.tokenizer
-        #     print(f"vLLM tokenizer type: {type(vllm_tokenizer)}")
-        #     print(f"Our tokenizer type: {type(self.tokenizer)}")
-        #     print(f"Tokenizer vocab size match: {len(vllm_tokenizer) == len(self.tokenizer)}")
-        # except Exception as e:
-        #     print(f"Could not access vLLM tokenizer for comparison: {e}")
 
         print(f"vLLM model loaded successfully!")
 
@@ -504,47 +494,14 @@ class VLLMModel(AbsModel):
         end_time = time.time()
         print(f"vLLM generation time: {end_time - start_time} seconds")
 
-        # Extract generated text - decode using our tokenizer to ensure consistency
-        # vLLM's output.text might use a different tokenizer, causing garbled output
-        preds = []
-        for output in outputs:
-            # Try to get token IDs from vLLM output and decode with our tokenizer
-            # This ensures we use the same tokenizer as the one used for chat template
-            try:
-                # Get token IDs from vLLM output (if available)
-                if hasattr(output.outputs[0], 'token_ids'):
-                    token_ids = output.outputs[0].token_ids
-                    # Decode using our tokenizer with skip_special_tokens
-                    decoded_text = self.tokenizer.decode(token_ids, skip_special_tokens=True)
-                else:
-                    # Fallback to vLLM's text if token_ids not available
-                    decoded_text = output.outputs[0].text
-            except (AttributeError, KeyError):
-                # Fallback to vLLM's text if token_ids access fails
-                decoded_text = output.outputs[0].text
-            preds.append(decoded_text)
-
-        # Post-process: remove chat template artifacts (same as HuggingFace implementation)
-        # This removes lines that are just role names or system prompts
-        cleaned_preds = []
-        for pred in preds:
-            # Remove lines that are just role names or system prompts
-            lines = pred.split('\n')
-            filtered_lines = []
-            for line in lines:
-                stripped = line.strip()
-                # Skip lines that are just "user" or "assistant" or empty
-                if stripped and stripped.lower() not in ['user', 'assistant', 'system']:
-                    filtered_lines.append(line)
-
-            cleaned_text = '\n'.join(filtered_lines).strip()
-            cleaned_preds.append(cleaned_text)
+        # Extract generated text
+        preds = [output.outputs[0].text for output in outputs]
 
         # Post-process for thinking mode
         if is_thinking:
-            cleaned_preds = [p.split("</think>")[-1] for p in cleaned_preds]
+            preds = [p.split("</think>")[-1] for p in preds]
 
-        return {"responses": cleaned_preds}
+        return {"responses": preds}
 
     def predict_classification_nlu(self, prompts: List[str], labels: List[str], **kwargs):
         """Classification not yet supported with vLLM in this implementation."""
