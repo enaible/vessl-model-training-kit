@@ -32,7 +32,7 @@ def parse_args():
     parser.add_argument(
         "--dataset",
         type=str,
-        default="arc",
+        default="ifeval",
         choices=[
         "thaiexam",
          "arc",
@@ -127,8 +127,15 @@ def parse_args():
     parser.add_argument(
         "--language",
         type=str,
-        default="en",
+        default="tha",
         help="Language to evaluate on",
+    )
+
+    parser.add_argument(
+        "--add_to_wandb",
+        type=bool,
+        default=False,
+        help="Whether to add the evaluation results to wandb",
     )
 
     return parser.parse_args()
@@ -193,16 +200,16 @@ async def main():
     end_time = time.time()
     print(f"Model loaded in {end_time - start_time} seconds")
     # Initialize wandb
-    
-    wandb.init(
-        project=args.project_name,
-        name=f"eval-{args.model_id}-{args.extra_name}",
-        config={
-            "model_id": args.model_id,
-            "dataset": args.dataset,
-            "subsets": args.subsets,
-        },
-    )
+    if args.add_to_wandb:
+        wandb.init(
+            project=args.project_name,
+            name=f"eval-{args.model_id}-{args.extra_name}",
+            config={
+                "model_id": args.model_id,
+                "dataset": args.dataset,
+                "subsets": args.subsets,
+            },
+        )
     
     if args.is_thinking == "True":
         args.is_thinking = True

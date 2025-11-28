@@ -44,7 +44,8 @@ class IFEVALEvaluator(BaseEvaluator):
                 if row.get('is_done', False):
                     continue
                 prompt = self.get_prompt(row)
-                responses = self.model_runner.predict_generation([prompt])
+                kwargs = {"temperature": 0.01}
+                responses = self.model_runner.predict_generation([prompt], **kwargs)
                 row['response'] = responses['responses'][0] if isinstance(responses['responses'], list) else responses['responses']
                 row['is_done'] = True
         return payload
