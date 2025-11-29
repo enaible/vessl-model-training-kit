@@ -11,7 +11,7 @@ from .base import BaseEvaluator
 
 
 class ARCEvaluator(BaseEvaluator):
-    def __init__(self, model_runner, wandb_config: Dict[str, Any], language: str = "tha"):
+    def __init__(self, model_runner, wandb_config: Dict[str, Any], language: str = "tha", save_to_wandb: bool = False):
         super().__init__(model_runner, wandb_config)
         self.label_mapping = {0: "a", 1: "b", 2: "c", 3: "d", 4: "e", 5: "no_answer"}
         self.label_names = list(
@@ -21,9 +21,11 @@ class ARCEvaluator(BaseEvaluator):
         self.label_to_id_dict.update({"1": 0, "2": 1, "3": 2, "4": 3, "5": 4, "-1": 5})
         ## Update just in case 1,2,3,4,5
         self.language = language
-
+        self.save_to_wandb = save_to_wandb
+        
     async def evaluate(self, is_thinking: bool = False, start_index: int = 0, end_index: int = -1) -> Dict[str, Any]:
-        await self._evaluate_subset(is_thinking, start_index, end_index)
+        accuracy = await self._evaluate_subset(is_thinking, start_index, end_index)
+        return accuracy
 
     async def _evaluate_subset(self, is_thinking: bool = False, start_index: int = 0, end_index: int = -1) -> Dict[str, Any]:
         inputs, preds, golds, llm_responses = [], [], [], []
@@ -93,26 +95,31 @@ class ARCEvaluator(BaseEvaluator):
             }
         )
         # Log metrics
-        self.log_metrics(
-            "default", metrics, golds, preds, self.label_names, inputs
-        )
-        table_data = {
-            "input": [],
-            "predicted_answer": [],
-            "gold_answer": [],
-            "llm_response": [],
-            "is_correct": [],
-        }
-        for prompt_text, hyp, label, model_response in zip(
-            inputs, preds, golds, llm_responses
-        ):
-            table_data["input"].append(prompt_text)
-            table_data["predicted_answer"].append(hyp)
-            table_data["gold_answer"].append(label)
-            table_data["llm_response"].append(model_response)
-            table_data["is_correct"].append(hyp == label)
-        table = wandb.Table(data=pd.DataFrame(table_data))
-        wandb.log({f"ARC-challenge/table": table})
+        if self.save_to_wandb:
+            self.log_metrics(
+                "default", metrics, golds, preds, self.label_names, inputs
+            )
+            table_data = {
+                "input": [],
+                "predicted_answer": [],
+                "gold_answer": [],
+                "llm_response": [],
+                "is_correct": [],
+            }
+            for prompt_text, hyp, label, model_response in zip(
+                inputs, preds, golds, llm_responses
+            ):
+                table_data["input"].append(prompt_text)
+                table_data["predicted_answer"].append(hyp)
+                table_data["gold_answer"].append(label)
+                table_data["llm_response"].append(model_response)
+                table_data["is_correct"].append(hyp == label)
+                
+            table = wandb.Table(data=pd.DataFrame(table_data))
+            wandb.log({f"ARC-challenge/table": table})
+        return metrics['accuracy']
+        
+        
         # Log metrics
     def log_metrics(
         self,
@@ -125,16 +132,15 @@ class ARCEvaluator(BaseEvaluator):
     ):
         """Common method to log metrics to wandb"""
         # Log basic metrics
-
         wandb.log(
-            {
-                f"{subset}/accuracy": metrics["accuracy"],
-                f"{subset}/micro_f1": metrics["micro_f1"],
-                f"{subset}/macro_f1": metrics["macro_f1"],
-                f"{subset}/weighted_f1": metrics["weighted_f1"],
-            }
-        )
-
+        {
+            f"{subset}/accuracy": metrics["accuracy"],
+            f"{subset}/micro_f1": metrics["micro_f1"],
+            f"{subset}/macro_f1": metrics["macro_f1"],
+            f"{subset}/weighted_f1": metrics["weighted_f1"],
+        }
+    )
+    
         # Log confusion matrix
         wandb.log(
             {

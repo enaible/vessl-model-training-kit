@@ -7,23 +7,27 @@
 MODEL_ID="/root/nas/updated_final_model"
 USE_VLLM="True"
 USE_SOLAR_MOE="True"
-PROJECT_NAME="thai_eval_vllm_total"
+PROJECT_NAME="tmai-final-model-eval"
 EXTRA_NAME=""
-LANGUAGE="tha"
+ADD_TO_WANDB="True"
 
-# Datasets to evaluate
-DATASETS=(
-    # "thaiexam"
+# Datasets to evaluate with both languages
+MULTI_LANG_DATASETS=(
     "arc"
-    "xlsum"
-    "mtbench"
     "hellaswag"
     "gsm8k"
     "mmlu"
     "truthfulqa"
     "winogrande"
+)
+
+# Datasets to evaluate with Thai only
+THAI_ONLY_DATASETS=(
     "ifeval"
 )
+
+# Languages for multi-language datasets
+LANGUAGES=("tha" "en")
 
 # Log file for errors
 LOG_DIR="./eval_logs"
@@ -31,7 +35,8 @@ mkdir -p "$LOG_DIR"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 LOG_FILE="$LOG_DIR/eval_${TIMESTAMP}.log"
 ERROR_LOG="$LOG_DIR/errors_${TIMESTAMP}.log"
-
+SAVE_TO="./${TIMESTAMP}_evaluation/"
+mkdir -p "$SAVE_TO"
 # Function to log messages
 log_message() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
@@ -42,8 +47,11 @@ log_error() {
 }
 
 # Initialize logs
+TOTAL_EVALS=$((${#MULTI_LANG_DATASETS[@]} * ${#LANGUAGES[@]} + ${#THAI_ONLY_DATASETS[@]}))
 log_message "Starting evaluation for model: $MODEL_ID"
-log_message "Total datasets to evaluate: ${#DATASETS[@]}"
+log_message "Multi-language datasets: ${#MULTI_LANG_DATASETS[@]} × ${#LANGUAGES[@]} languages"
+log_message "Thai-only datasets: ${#THAI_ONLY_DATASETS[@]}"
+log_message "Total evaluations: $TOTAL_EVALS"
 log_message "Log file: $LOG_FILE"
 log_message "Error log: $ERROR_LOG"
 log_message "=========================================="
@@ -53,11 +61,14 @@ SUCCESSFUL=0
 FAILED=0
 FAILED_DATASETS=()
 
-# Iterate through each dataset
-for dataset in "${DATASETS[@]}"; do
+# Function to run evaluation
+run_evaluation() {
+    local dataset=$1
+    local language=$2
+    
     log_message ""
     log_message "=========================================="
-    log_message "Evaluating dataset: $dataset"
+    log_message "Evaluating: $dataset (language: $language)"
     log_message "=========================================="
     
     # Build command
@@ -67,7 +78,9 @@ for dataset in "${DATASETS[@]}"; do
         --use_solar_moe $USE_SOLAR_MOE \
         --dataset $dataset \
         --project_name $PROJECT_NAME \
-        --language $LANGUAGE"
+        --language $language \
+        --add_to_wandb $ADD_TO_WANDB \
+        --save_to $SAVE_TO"
     
     if [ -n "$EXTRA_NAME" ]; then
         CMD="$CMD --extra_name $EXTRA_NAME"
@@ -85,16 +98,28 @@ for dataset in "${DATASETS[@]}"; do
     
     if [ $EXIT_CODE -eq 0 ]; then
         SUCCESSFUL=$((SUCCESSFUL + 1))
-        log_message "✓ SUCCESS: $dataset completed in ${DURATION}s"
+        log_message "✓ SUCCESS: $dataset ($language) completed in ${DURATION}s"
     else
         FAILED=$((FAILED + 1))
-        FAILED_DATASETS+=("$dataset")
-        log_error "✗ FAILED: $dataset (exit code: $EXIT_CODE, duration: ${DURATION}s)"
-        log_message "Continuing to next dataset..."
+        FAILED_DATASETS+=("$dataset ($language)")
+        log_error "✗ FAILED: $dataset ($language) (exit code: $EXIT_CODE, duration: ${DURATION}s)"
+        log_message "Continuing to next evaluation..."
     fi
     
-    # Small delay between datasets to allow cleanup
+    # Small delay between evaluations to allow cleanup
     sleep 2
+}
+
+# Evaluate multi-language datasets with both languages
+for dataset in "${MULTI_LANG_DATASETS[@]}"; do
+    for language in "${LANGUAGES[@]}"; do
+        run_evaluation "$dataset" "$language"
+    done
+done
+
+# Evaluate Thai-only datasets
+for dataset in "${THAI_ONLY_DATASETS[@]}"; do
+    run_evaluation "$dataset" "tha"
 done
 
 # Summary
@@ -102,7 +127,7 @@ log_message ""
 log_message "=========================================="
 log_message "EVALUATION SUMMARY"
 log_message "=========================================="
-log_message "Total datasets: ${#DATASETS[@]}"
+log_message "Total evaluations: $TOTAL_EVALS"
 log_message "Successful: $SUCCESSFUL"
 log_message "Failed: $FAILED"
 
@@ -122,6 +147,6 @@ if [ $FAILED -gt 0 ]; then
     log_message "Errors saved to: $ERROR_LOG"
     exit 1
 else
-    log_message "All datasets evaluated successfully!"
+    log_message "All evaluations completed successfully!"
     exit 0
 fi

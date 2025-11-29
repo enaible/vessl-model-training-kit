@@ -11,7 +11,8 @@ from .truthfulqa import TruthfulQAEvaluator
 from .winogrande import WinograndeEvaluator
 from .ifeval import IFEVALEvaluator
 def get_evaluator(
-    dataset_name: str, model_runner, wandb_config: Dict[str, Any], language: str = "tha"
+    dataset_name: str, model_runner, wandb_config: Dict[str, Any], language: str = "tha", 
+    save_to_wandb: bool = False,
 ) -> BaseEvaluator:
     """Factory function to get the appropriate evaluator"""
     evaluators = {
@@ -29,5 +30,5 @@ def get_evaluator(
 
     if dataset_name not in evaluators:
         raise ValueError(f"Dataset {dataset_name} not supported")
-    return evaluators[dataset_name](model_runner, wandb_config, language = language)
+    return evaluators[dataset_name](model_runner, wandb_config, language = language, save_to_wandb = save_to_wandb)
 

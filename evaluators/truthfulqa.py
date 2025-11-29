@@ -11,12 +11,13 @@ from .base import BaseEvaluator
 
 
 class TruthfulQAEvaluator(BaseEvaluator):
-    def __init__(self, model_runner, wandb_config: Dict[str, Any], language: str = "tha"):
+    def __init__(self, model_runner, wandb_config: Dict[str, Any], language: str = "tha", save_to_wandb: bool = False):
         super().__init__(model_runner, wandb_config)
         self.language = language
-
+        self.save_to_wandb = save_to_wandb
     async def evaluate(self, is_thinking: bool = False, start_index: int = 0, end_index: int = -1) -> Dict[str, Any]:
-        await self._evaluate_subset(is_thinking, start_index, end_index)
+        accuracy = await self._evaluate_subset(is_thinking, start_index, end_index)
+        return accuracy
 
     async def _evaluate_subset(self, is_thinking: bool = False, start_index: int = 0, end_index: int = -1) -> Dict[str, Any]:
         inputs, preds, golds, llm_responses = [], [], [], []
@@ -81,31 +82,32 @@ class TruthfulQAEvaluator(BaseEvaluator):
         )
 
         # Log overall metrics to wandb
-        wandb.log({
+        if self.save_to_wandb:
+            wandb.log({
             "accuracy": metrics["average_score"],
         })
 
-        # Create detailed results table
-        table_data = {
-            "index": [],
-            "score": [],
-            "input": [],
-            "reference": [],
-            "response": [],
-            "llm_response": []
-        }
-        for result in judge_results:
-            table_data["index"].append(result["index"])
-            table_data["score"].append(result["score"])
-            table_data["input"].append(result["input"][:200] if result["input"] else "")
-            table_data["reference"].append(result["gold"])
-            table_data["response"].append(result["pred"])
-            table_data["llm_response"].append(result["llm_response"])
-        # Log results table
-        table = wandb.Table(data=pd.DataFrame(table_data))
-        wandb.log({"truthfulqa_results": table})
+            # Create detailed results table
+            table_data = {
+                "index": [],
+                "score": [],
+                "input": [],
+                "reference": [],
+                "response": [],
+                "llm_response": []
+            }
+            for result in judge_results:
+                table_data["index"].append(result["index"])
+                table_data["score"].append(result["score"])
+                table_data["input"].append(result["input"][:200] if result["input"] else "")
+                table_data["reference"].append(result["gold"])
+                table_data["response"].append(result["pred"])
+                table_data["llm_response"].append(result["llm_response"])
+            # Log results table
+            table = wandb.Table(data=pd.DataFrame(table_data))
+            wandb.log({"truthfulqa_results": table})
 
-        return metrics
+        return metrics['average_score']
 
     def calculate_result(
         self, golds: List[List[int]], preds: List[List[int]], inputs: List[str], llm_responses: List[str]

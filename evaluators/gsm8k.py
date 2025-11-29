@@ -23,12 +23,14 @@ class GSM8KEvaluator(BaseEvaluator):
         judge_num_workers=8,
         settings: Settings = load_settings(),
         language: str = "tha",
+        save_to_wandb: bool = False,
     ) -> None:
         self.data_path = f"{project_root}/thai_h6_data/th_gsm8k/test.json"
         self.model_runner = model_runner
         self.wandb_config = wandb_config
         self.settings = settings
         self.language = language
+        self.save_to_wandb = save_to_wandb
     def get_prompt(self, row: dict) -> str:
         """Extract the Thai question from the row."""
         if self.language == "tha":
@@ -124,7 +126,8 @@ class GSM8KEvaluator(BaseEvaluator):
         metric_results, judge_results = await self.calculate_result(payload)
 
         cleanup_vllm_model()
-        wandb.log(metric_results)
+        if self.save_to_wandb:
+            wandb.log(metric_results)
 
         table_data = {
             "question_id": [],
@@ -145,7 +148,9 @@ class GSM8KEvaluator(BaseEvaluator):
             table_data["is_correct"].append(result["is_correct"])
 
         # Log results table
-        table = wandb.Table(data=pd.DataFrame(table_data))
-        wandb.log({"gsm8k_results": table})
+        
+        if self.save_to_wandb:
+            table = wandb.Table(data=pd.DataFrame(table_data))
+            wandb.log({"gsm8k_results": table})
 
-        return metric_results
+        return metric_results['accuracy']

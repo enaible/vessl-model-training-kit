@@ -23,12 +23,14 @@ class IFEVALEvaluator(BaseEvaluator):
         judge_num_workers=8,
         settings: Settings = load_settings(),
         language: str = "tha",
+        save_to_wandb: bool = False,
     ) -> None:
         self.data_path = f"{project_root}/SFT_data_gen/source_data/ifeval_th.json"
         self.model_runner = model_runner
         self.wandb_config = wandb_config
         self.settings = settings
         self.language = language
+        self.save_to_wandb = save_to_wandb
     def get_prompt(self, row: dict) -> str:
         """Extract the Thai question from the row."""
         if self.language != "tha":
@@ -129,32 +131,32 @@ class IFEVALEvaluator(BaseEvaluator):
 
         metric_results, judge_results = await self.calculate_result(payload)
 
-        wandb.log(metric_results)
+        if self.save_to_wandb:
+            wandb.log(metric_results)
 
-        table_data = {
-            "question_id": [],
-            "key": [],
-            "prompt": [],
-            "response": [],
-            "instruction_id_list": [],
-            "prompt_level_strict_acc": [],
-            "prompt_level_loose_acc": [],
-            "inst_level_strict_acc": [],
-            "inst_level_loose_acc": [],
-        }
-        for result in judge_results:
-            table_data["question_id"].append(result["question_id"])
-            table_data["key"].append(result["key"])
-            table_data["prompt"].append(result["prompt"])
-            table_data["response"].append(result["response"])
-            table_data["instruction_id_list"].append(str(result["instruction_id_list"]))
-            table_data["prompt_level_strict_acc"].append(result["prompt_level_strict_acc"])
-            table_data["prompt_level_loose_acc"].append(result["prompt_level_loose_acc"])
-            table_data["inst_level_strict_acc"].append(str(result["inst_level_strict_acc"]))
-            table_data["inst_level_loose_acc"].append(str(result["inst_level_loose_acc"]))
+            table_data = {
+                "question_id": [],
+                "key": [],
+                "prompt": [],
+                "response": [],
+                "instruction_id_list": [],
+                "prompt_level_strict_acc": [],
+                "prompt_level_loose_acc": [],
+                "inst_level_strict_acc": [],
+                "inst_level_loose_acc": [],
+            }
+            for result in judge_results:
+                table_data["question_id"].append(result["question_id"])
+                table_data["key"].append(result["key"])
+                table_data["prompt"].append(result["prompt"])
+                table_data["response"].append(result["response"])
+                table_data["instruction_id_list"].append(str(result["instruction_id_list"]))
+                table_data["prompt_level_strict_acc"].append(result["prompt_level_strict_acc"])
+                table_data["prompt_level_loose_acc"].append(result["prompt_level_loose_acc"])
+                table_data["inst_level_strict_acc"].append(str(result["inst_level_strict_acc"]))
+                table_data["inst_level_loose_acc"].append(str(result["inst_level_loose_acc"]))
 
-        # Log results table
-        table = wandb.Table(data=pd.DataFrame(table_data))
-        wandb.log({"ifeval_results": table})
+            table = wandb.Table(data=pd.DataFrame(table_data))
+            wandb.log({"ifeval_results": table})
 
-        return metric_results
+        return metric_results['total_acc']

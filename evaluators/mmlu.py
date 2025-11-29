@@ -13,7 +13,7 @@ from .base import BaseEvaluator
 import csv
 
 class MMLUEvaluator(BaseEvaluator):
-    def __init__(self, model_runner, wandb_config: Dict[str, Any], language: str = "tha"):
+    def __init__(self, model_runner, wandb_config: Dict[str, Any], language: str = "tha", save_to_wandb: bool = False):
         super().__init__(model_runner, wandb_config)
         self.label_mapping = {0: "a", 1: "b", 2: "c", 3: "d", 4: "e", 5: "no_answer"}
         self.label_names = list(
@@ -23,7 +23,7 @@ class MMLUEvaluator(BaseEvaluator):
         self.label_to_id_dict.update({"1": 0, "2": 1, "3": 2, "4": 3, "5": 4})
         ## Update just in case 1,2,3,4,5
         self.language = language
-
+        self.save_to_wandb = save_to_wandb
     def calculate_result(
         self, golds: List[int], preds: List[int], inputs: List[str], dataset: List[dict], llm_responses: List[str]
     ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
@@ -106,7 +106,8 @@ class MMLUEvaluator(BaseEvaluator):
         return metrics, all_results
 
     async def evaluate(self, is_thinking: bool = False, start_index: int = 0, end_index: int = -1) -> Dict[str, Any]:
-        await self._evaluate_subset(is_thinking, start_index, end_index)
+        accuracy = await self._evaluate_subset(is_thinking, start_index, end_index)
+        return accuracy
 
 
     async def _evaluate_subset(self, is_thinking: bool = False, start_index: int = 0, end_index: int = -1) -> Dict[str, Any]:
@@ -177,44 +178,46 @@ class MMLUEvaluator(BaseEvaluator):
             }
         )
 
-        self.log_metrics(
-            "default", metric_results, golds, preds, self.label_names, inputs
-        )
+        if self.save_to_wandb:
 
-        # Log category-specific accuracies
-        for subject, acc_data in metric_results["category_accuracies"].items():
-            wandb.log({
-                f"category_accuracy/{subject}": acc_data["accuracy"],
-                f"category_correct/{subject}": acc_data["correct"],
-                f"category_total/{subject}": acc_data["total"],
-            })
+            self.log_metrics(
+                "default", metric_results, golds, preds, self.label_names, inputs
+            )
 
-        # Create a table for detailed results
-        table_data = {
-            "index": [],
-            "subject": [],
-            "input_text": [],
-            "subject": [],
-            "prediction": [],
-            "gold_label": [],
-            "llm_response": [],
-            "is_correct": [],
-        }
+            # Log category-specific accuracies
+            for subject, acc_data in metric_results["category_accuracies"].items():
+                wandb.log({
+                    f"category_accuracy/{subject}": acc_data["accuracy"],
+                    f"category_correct/{subject}": acc_data["correct"],
+                    f"category_total/{subject}": acc_data["total"],
+                })
 
-        for result in judge_results:
-            table_data["index"].append(result["index"])
-            table_data["input_text"].append(result["input_text"])
-            table_data["subject"].append(result["subject"])
-            table_data["prediction"].append(result["prediction"])
-            table_data["gold_label"].append(result["gold_label"])
-            table_data["llm_response"].append(result["llm_response"])
-            table_data["is_correct"].append(result["is_correct"])
+            # Create a table for detailed results
+            table_data = {
+                "index": [],
+                "subject": [],
+                "input_text": [],
+                "subject": [],
+                "prediction": [],
+                "gold_label": [],
+                "llm_response": [],
+                "is_correct": [],
+            }
 
-        # Log results table
-        table = wandb.Table(data=pd.DataFrame(table_data))
-        wandb.log({"mmlu_results": table})
+            for result in judge_results:
+                table_data["index"].append(result["index"])
+                table_data["input_text"].append(result["input_text"])
+                table_data["subject"].append(result["subject"])
+                table_data["prediction"].append(result["prediction"])
+                table_data["gold_label"].append(result["gold_label"])
+                table_data["llm_response"].append(result["llm_response"])
+                table_data["is_correct"].append(result["is_correct"])
 
-        return metric_results
+            # Log results table
+            table = wandb.Table(data=pd.DataFrame(table_data))
+            wandb.log({"mmlu_results": table})
+
+        return metric_results['accuracy']
 
     def log_metrics(
         self,

@@ -120,7 +120,7 @@ def parse_args():
     parser.add_argument(
         "--end_index",
         type=int,
-        default = -1,
+        default = 10,
         help="End index to evaluate",
     )
 
@@ -136,6 +136,14 @@ def parse_args():
         type=bool,
         default=False,
         help="Whether to add the evaluation results to wandb",
+    )
+    eval_time = time.time()
+
+    parser.add_argument(
+        "--save_to",
+        type=str,
+        default=f"./{eval_time}_evaluation/",
+        help="Directory to save the evaluation results",
     )
 
     return parser.parse_args()
@@ -219,12 +227,12 @@ async def main():
         raise ValueError("is_thinking must be True or False")
     # Get appropriate evaluator and run evaluation
 
-    evaluator = get_evaluator(args.dataset, model_runner, wandb.config, language = args.language)
+    evaluator = get_evaluator(args.dataset, model_runner, wandb.config, language = args.language, save_to_wandb = args.add_to_wandb)
     start_time = time.time()
     if args.dataset == "ifeval":
         metrics = await evaluator.evaluate(args.is_thinking, args.start_index, args.end_index)
     elif args.dataset == "thaiexam":
-        metrics = await evaluator.evaluate(args.subsets, args.is_thinking, args.start_index, args.end_index)
+        metrics = await evaluator.evaluate(args.subsets, args.is_thinking)
     elif args.dataset == 'mtbench':
         metrics = evaluator.evaluate(args.subsets, args.is_thinking)
     elif args.dataset == 'arc':
@@ -246,6 +254,9 @@ async def main():
     wandb.finish()
     end_time = time.time()
     print(f"Evaluation ended in {end_time}. The evaluation took {end_time - start_time} seconds")
+
+    with open(f"{args.save_to}/{args.dataset}_{args.language}_accuracy.txt", "w") as f:
+        f.write(f"Accuracy: {metrics}")
 
     # Cleanup and exit
     cleanup_and_exit()
