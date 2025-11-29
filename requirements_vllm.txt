@@ -272,7 +272,6 @@ six==1.17.0
 smart_open==7.5.0
 smmap==5.0.2
 sniffio==1.3.1
--e git+https://github.com/enaible/tmai_thai_vllm.git@538fb1293a8b0eff618277494a096d792ad5fbe3#egg=solar_moe_vllm_plugin
 soupsieve==2.8
 sqlitedict==2.1.0
 stack-data==0.6.3
