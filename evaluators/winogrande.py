@@ -64,8 +64,8 @@ class WinograndeEvaluator(BaseEvaluator):
         metrics = {}
         accuracies = []
         subset_metrics = await self._evaluate_subset(is_thinking, start_index, end_index)
-        accuracies.append(subset_metrics["accuracy"])
-        return subset_metrics['accuracy']
+        accuracies.append(subset_metrics)
+        return subset_metrics
 
     async def _evaluate_subset(self, is_thinking: bool = False, start_index: int = 0, end_index: int = -1) -> Dict[str, Any]:
         inputs, preds, golds, llm_responses = [], [], [], []
