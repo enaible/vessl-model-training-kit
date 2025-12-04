@@ -11,46 +11,6 @@ import os
 from utils.path import get_assets_dir
 from model.dto import MCQ_QA_BaseResponse, MCQ_QA_ReasoningResponse
 from settings import load_settings
-import google.generativeai as genai
-
-class GeminiModel:
-    def __init__(self, model_name, batch_size: int = 8):
-        self.settings = load_settings()
-        self.api_key = self.settings.gemini_api_key
-        self.model_name = model_name
-        self.batch_size = batch_size
-        self.max_generation_length = 1024
-        self.client = genai.Client(api_key=self.api_key)
-
-    def _generate(self, inputs, model_name: str, response_model: BaseModel | None = None):
-        response = self._generate_full(inputs, model_name, response_model)
-        # You may need to parse the response differently depending on Gemini's API
-        return response.text  # or whatever field contains the text
-
-    def _generate_full(self, inputs, model_name: str, response_model: BaseModel | None = None):
-        # Gemini expects a prompt string, not a list of messages
-        if isinstance(inputs, list) and isinstance(inputs[0], dict):
-            prompt = inputs[0]['content']
-        else:
-            prompt = inputs
-        response = self.client.models.generate_content(
-            model=self.model_name,
-            contents=prompt,
-            generation_config={
-                "max_output_tokens": self.max_generation_length,
-                "temperature": 0.0,
-            }
-        )
-        return response
-
-    def predict_generation(self, prompts, response_model: BaseModel, **kwargs) -> List[str]:
-        _fn = partial(self._generate, model_name=self.model_name, response_model=response_model)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.batch_size) as executor:
-            results = list(executor.map(_fn, prompts))
-        return results
-
-    # Implement other methods (predict_classification_nlu, make_translate_prompt, translate_text) similarly,
-    # adapting the prompt formatting and response parsing as needed for Gemini.
 
 class OpenAIModel:
 

@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from utils.is_api import ModelType
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from model.api_model import OpenAIModel, GeminiModel
+from model.api_model import OpenAIModel
 
 try:
     from vllm import LLM, SamplingParams
@@ -554,10 +554,7 @@ class VLLMModel(AbsModel):
 def load_model_runner(model_name: str, fast=False):
     model_type = ModelType(model_name)
     if model_type.is_api:
-        if model_type.model_type == "openai":
-            model_runner = OpenAIModel(model_name, batch_size=8)
-        elif model_type.model_type == "gemini":
-            model_runner = GeminiModel(model_name, batch_size=8)
+        model_runner = OpenAIModel(model_name, batch_size=8)
     elif model_type.model_type == "HF":
         try:
             model_runner = HFModel(model_name, compile=fast)
